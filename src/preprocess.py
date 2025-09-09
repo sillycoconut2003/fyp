@@ -6,7 +6,7 @@ import os
 # Add the src directory to the path to allow imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config import COLS, INTERIM, NUMS
+from config import COLS, INTERIM
 
 def _ensure_numeric(df: pd.DataFrame, cols):
     for c in cols:

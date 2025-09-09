@@ -22,6 +22,3 @@ COLS = {
     "mo": "PERIOD_MONTH",
     "ym": "YYYY_MM",
 }
-
-# Numeric columns we might transform
-NUMS = ["MONTHLY_TARGET","MONTHLY_ACTUAL","YTD_TARGET","YTD_ACTUAL"]
