@@ -8,11 +8,9 @@ FYP PROJECT/
 │   ├── config.py                # Configuration settings
 │   ├── eval.py                  # Evaluation metrics
 │   ├── features.py              # Feature engineering
-│   ├── model_reg.py             # ML model definitions
-│   ├── model_ts.py              # Time series models
 │   ├── preprocess.py            # Data preprocessing
-│   ├── train_ml.py              # ML training pipeline ⭐
-│   ├── train_ts.py              # Time series training
+│   ├── train_ml.py              # Optimized ML training pipeline ⭐
+│   ├── train_ts.py              # Time series training pipeline ⭐
 │   └── utils_io.py              # I/O utilities
 │
 ├── 🎯 dashboard/                # Interactive dashboard

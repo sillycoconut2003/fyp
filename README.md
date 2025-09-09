@@ -27,8 +27,8 @@ mta-kpi/
 │  ├─ utils_io.py
 │  ├─ preprocess.py
 │  ├─ features.py        # Build processed dataset (Step 1)
-│  ├─ model_ts.py
-│  ├─ model_reg.py
+│  ├─ train_ml.py        # Optimized ML training pipeline
+│  ├─ train_ts.py        # Time series training pipeline
 │  └─ eval.py
 ├─ dashboard/
 │  └─ app.py             # Streamlit dashboard
