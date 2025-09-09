@@ -1,6 +1,6 @@
-# 🚇 MTA KPI Forecasting System - Project Structure
+# MTA KPI Forecasting System Project Structure
 
-## 📁 Directory Organization
+## Directory Organization
 
 ```
 FYP PROJECT/
@@ -53,8 +53,6 @@ FYP PROJECT/
 └── ⚙️ Makefile                 # Build automation
 ```
 
-## 🎯 Key Files for FYP Presentation
-
 ### **Core Implementation**
 - **`src/train_ml.py`** - Main ML training with optimized hyperparameters
 - **`dashboard/app.py`** - Interactive forecasting dashboard
@@ -72,28 +70,7 @@ FYP PROJECT/
 - **`run_dashboard.bat`** - One-click dashboard startup
 - **`data/processed/mta_model.parquet`** - Ready-to-use dataset
 
-## 🏆 Project Achievements
-
-### **Performance Metrics**
-- **RandomForest**: MAE 14,095 (Champion) ⭐
-- **XGBoost**: MAE 39,885 (9.5% optimized) ⭐  
-- **Ridge Regression**: MAE 96,886 (34.8% improved) ⭐
-- **267 Total Models**: 3 ML + 264 Time Series
-
-### **Technical Contributions**
-- ✅ Systematic hyperparameter optimization
-- ✅ Time series cross-validation methodology  
-- ✅ Multi-scale data handling (decimals to millions)
-- ✅ Professional dashboard with clean UI
-- ✅ Comprehensive model selection framework
-
-### **Academic Value**
-- 🎓 Demonstrates ML engineering best practices
-- 🎓 Shows optimization methodology understanding
-- 🎓 Illustrates practical forecasting deployment
-- 🎓 Proves systematic approach to model evaluation
-
-## 🚀 Quick Start Commands
+## Quick Start Commands
 
 ```bash
 # Install dependencies
@@ -109,24 +86,22 @@ python src/train_ml.py
 python scripts/analysis/analyze_model_performance.py
 ```
 
-## 📊 File Usage Priority
+## File Usage Priority
 
-### **High Priority (FYP Essential)**
+### **High Priority**
 1. `src/train_ml.py` - Core training implementation
 2. `dashboard/app.py` - Interactive demonstration
 3. `reports/figures/` - Performance visualizations
 4. `docs/` - Documentation for presentation
 
-### **Medium Priority (Supporting)**
+### **Medium Priority**
 1. `scripts/optimization/` - Shows methodology
 2. `models/` - Trained model artifacts
 3. `data/processed/` - Clean dataset
 
-### **Low Priority (Background)**
+### **Low Priority**
 1. `scripts/analysis/` - Development tools
 2. `scripts/data_processing/` - Data preparation
 3. `notebooks/` - Exploratory analysis
 
 ---
-
-**🎯 Ready for FYP submission and defense presentation!**
