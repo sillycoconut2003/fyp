@@ -1,0 +1,89 @@
+/* Futuristic Dark Theme for Streamlit Dashboard */
+
+/* --- Base & Fonts --- */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
+
+body {
+    font-family: 'Roboto', sans-serif;
+    color: #E0E0E0; /* Light grey text */
+}
+
+/* --- Main App Container --- */
+.main .block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+    padding-left: 5rem;
+    padding-right: 5rem;
+}
+
+/* --- Sidebar --- */
+[data-testid="stSidebar"] {
+    background-color: #1E1E1E; /* Slightly lighter than main background */
+    border-right: 1px solid #4A4A4A;
+}
+
+[data-testid="stSidebar"] h2 {
+    color: #00A2FF; /* Bright blue for header */
+    font-weight: 700;
+}
+
+/* --- Headers & Titles --- */
+h1, h2, h3 {
+    color: #FFFFFF;
+    font-weight: 700;
+}
+
+h1 {
+    color: #00A2FF; /* Main title color */
+}
+
+/* --- Metric Cards --- */
+[data-testid="stMetric"] {
+    background-color: #2A2A2A;
+    border: 1px solid #4A4A4A;
+    border-radius: 10px;
+    padding: 15px;
+    text-align: center;
+}
+
+[data-testid="stMetricLabel"] {
+    font-size: 1rem;
+    color: #B0B0B0; /* Dimmer label */
+}
+
+[data-testid="stMetricValue"] {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: #FFFFFF;
+}
+
+[data-testid="stMetricDelta"] {
+    font-size: 1rem;
+    font-weight: 400;
+}
+
+/* --- Tabs --- */
+[data-testid="stTabs"] button {
+    color: #B0B0B0;
+    font-size: 1.1rem;
+}
+
+[data-testid="stTabs"] button[aria-selected="true"] {
+    color: #00A2FF;
+    border-bottom: 2px solid #00A2FF;
+}
+
+/* --- Custom HTML for Header --- */
+.header-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #00A2FF;
+    padding-bottom: 0;
+    margin-bottom: 0;
+}
+
+.header-subtitle {
+    font-size: 1.2rem;
+    color: #E0E0E0;
+    padding-top: 0;
+}

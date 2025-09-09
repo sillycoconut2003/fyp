@@ -23,6 +23,7 @@ set STREAMLIT_SERVER_ENABLE_STATIC_SERVING=false
 
 REM Navigate to project directory and start dashboard
 cd /d "%~dp0"
-streamlit run dashboard/app.py --server.port 8506
+streamlit run dashboard/app.py --server.port 8501
 
 pause
+ 
