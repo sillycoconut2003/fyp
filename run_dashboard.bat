@@ -10,20 +10,23 @@ echo   ✅ Ready for Presentation
 echo ========================================
 echo.
 echo 🔧 Loading optimized models:
-echo    - XGBoost: 39,885 MAE (9.5%% improvement)
-echo    - RandomForest: 46,891 MAE (2.8%% improvement) 
-echo    - Ridge Regression: 96,886 MAE (34.8%% improvement)
+echo    - RandomForest: 13,637 MAE (CHAMPION - 65.8%% better)
+echo    - XGBoost: 39,885 MAE 
+echo    - Ridge Regression: 130,912 MAE
+echo    - Time Series: 264 Prophet + SARIMA models
 echo.
 echo 📊 Starting dashboard with clean output...
 echo.
 
-REM Set environment variables to suppress warnings
+REM Set environment variables to suppress ALL verbose outputs
 set STREAMLIT_LOGGER_LEVEL=ERROR
 set STREAMLIT_SERVER_ENABLE_STATIC_SERVING=false
+set PYTHONWARNINGS=ignore
+set SKLEARN_SHOW_PROGRESS=False
 
-REM Navigate to project directory and start dashboard
+REM Navigate to project directory and start dashboard with output suppression
 cd /d "%~dp0"
-streamlit run dashboard/app.py --server.port 8501
+streamlit run dashboard/app.py --server.port 8501 2>nul
 
 pause
  
