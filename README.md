@@ -1,8 +1,26 @@
 # MTA KPI Analytics (VS Code Starter)
 
 This project predicts and analyzes monthly KPIs from the **MTA_Performance_Agencies.csv** dataset with two modelling tracks:
-- **Track A:** Per-series time-series (Prophet / SARIMA)
-- **Track B:** Multivariate ML (RandomForest / XGBoost / Linear) using engineered features
+- **Track A:** Per-series time-series (Prophet / SARIMA)  
+- **Track B:** Multivariate ML (RandomForest / XGBoost / Linear) with specialized percentage KPI handling
+
+## 🔧 **NEW: Specialized Percentage KPI Prediction**
+
+For percentage-based KPIs (like completion rates), this project now includes a specialized prediction system that addresses fundamental issues with applying general ML models to bounded operational metrics.
+
+**Key Features:**
+- Smart percentage KPI detection
+- Model-specific prediction strategies  
+- Realistic bounds enforcement (93-100% for completion rates)
+- Stable, deterministic results
+
+**Supported KPIs:**
+- % of Completed Trips (Bus/Transit)
+- Elevator/Escalator Availability  
+- On-time Performance Rates
+- Other operational efficiency metrics
+
+See [`docs/PERCENTAGE_KPI_GUIDE.md`](docs/PERCENTAGE_KPI_GUIDE.md) for complete details.
 
 ## Quickstart
 

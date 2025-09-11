@@ -19,6 +19,12 @@ logging.getLogger('streamlit.runtime.scriptrunner.script_runner').setLevel(loggi
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+# Import specialized percentage prediction
+from percentage_predictor import (
+    should_use_specialized_percentage_prediction,
+    predict_percentage_kpi_specialized
+)
+
 st.set_page_config(page_title="MTA KPI Analytics & Forecasting", layout="wide", initial_sidebar_state="expanded")
 
 def load_css():
@@ -39,9 +45,9 @@ def load_data():
     fp = Path(__file__).resolve().parents[1]/"data"/"processed"/"mta_model.parquet"
     return pd.read_parquet(fp)
 
-@st.cache_data
+@st.cache_data(show_spinner="Loading ML models...")
 def load_ml_models():
-    """Load trained ML models"""
+    """Load trained ML models with validation"""
     models_dir = Path(__file__).parent.parent / "models"
     ml_models = {}
     
@@ -56,9 +62,15 @@ def load_ml_models():
         if filepath.exists():
             try:
                 with open(filepath, 'rb') as f:
-                    ml_models[name] = pickle.load(f)
+                    model_data = pickle.load(f)
+                    # Validate model structure
+                    if 'model' in model_data and 'feature_cols' in model_data:
+                        ml_models[name] = model_data
+                        print(f"✅ Loaded {name}: {len(model_data['feature_cols'])} features")
+                    else:
+                        st.error(f"Invalid model structure in {name}")
             except Exception as e:
-                st.warning(f"Failed to load {name}: {e}")
+                st.error(f"Failed to load {name}: {e}")
         else:
             st.warning(f"Model file not found: {filename}")
     
@@ -85,139 +97,165 @@ def load_ts_models():
     
     return ts_models
 
-def predict_ml_model(df, model_info, model_name, periods=12):
+def simple_trend_forecast(df, periods=12):
+    """Simple fallback forecasting using linear trend"""
+    values = df['MONTHLY_ACTUAL'].values
+    dates = pd.to_datetime(df['YYYY_MM'])
+    
+    # Calculate linear trend
+    x = np.arange(len(values))
+    slope, intercept = np.polyfit(x, values, 1)
+    
+    # Generate future predictions
+    predictions = []
+    for i in range(periods):
+        future_x = len(values) + i
+        pred = slope * future_x + intercept
+        # Add some realistic variation
+        pred += np.random.normal(0, np.std(values) * 0.05)
+        predictions.append(max(0, pred))  # Ensure non-negative
+    
+    return predictions
+
+def predict_ml_model(df, model_info, model_name, periods=12, kpi_name=""):
     """Make predictions with a feature-based ML model using iterative forecasting."""
     try:
         model = model_info['model']
         feature_cols = model_info['feature_cols']
+        
+        # Validate inputs
+        if len(df) < 12:
+            print(f"⚠️ Insufficient data for {model_name}: {len(df)} records")
+            return simple_trend_forecast(df, periods)
         
         # Create extended dataset for iterative predictions
         df_extended = df.copy()
         df_extended['Date'] = pd.to_datetime(df_extended['YYYY_MM'])
         df_extended = df_extended.sort_values('Date')
         
+        # Check if this is a percentage KPI that needs specialized handling
+        recent_actuals = df_extended['MONTHLY_ACTUAL'].iloc[-12:].values
+        if should_use_specialized_percentage_prediction(kpi_name, recent_actuals):
+            print(f"🎯 Using specialized percentage prediction for {kpi_name}")
+            return predict_percentage_kpi_specialized(
+                df_extended, kpi_name, model_name, model, periods
+            )
+        
+        # Original prediction logic for non-percentage KPIs continues below
+        # Check critical features availability
+        missing_features = [col for col in feature_cols if col not in df_extended.columns]
+        if len(missing_features) > len(feature_cols) * 0.3:  # If >30% features missing
+            print(f"⚠️ Too many missing features for {model_name}: {len(missing_features)}/{len(feature_cols)}")
+            return simple_trend_forecast(df, periods)
+        
+        # Get baseline statistics for bounds checking
+        historical_mean = df_extended['MONTHLY_ACTUAL'].mean()
+        historical_std = df_extended['MONTHLY_ACTUAL'].std()
+        historical_max = df_extended['MONTHLY_ACTUAL'].max()
+        historical_min = df_extended['MONTHLY_ACTUAL'].min()
+        
+        # Normal bounds for other KPIs
+        upper_bound = historical_mean + 2 * historical_std
+        lower_bound = max(0, historical_mean - 2 * historical_std)
+        
         last_date = df_extended['Date'].max()
         predictions = []
         dates = []
         
-        # Iterative prediction: predict one step at a time
+        print(f"🔍 {model_name} prediction bounds: {lower_bound:.0f} - {upper_bound:.0f}")
+        
+        # Use the last known row as template for feature alignment
+        template_row = df_extended.iloc[-1:].copy()
+        
+        # Iterative prediction with robust feature engineering
         for i in range(periods):
             current_date = last_date + pd.DateOffset(months=i+1)
             dates.append(current_date)
             
-            # Create feature row for current prediction
-            future_row = pd.DataFrame({'YYYY_MM': [current_date]})
-            future_row['PERIOD_YEAR'] = current_date.year
-            future_row['PERIOD_MONTH'] = current_date.month
+            # Create prediction row based on template
+            future_row = template_row.copy()
+            future_row['YYYY_MM'] = current_date
+            future_row['Date'] = current_date
             
-            # Dynamic lag features using most recent data (including previous predictions)
+            # Update time-based features safely
+            if 'PERIOD_YEAR' in future_row.columns:
+                future_row['PERIOD_YEAR'] = current_date.year
+            if 'PERIOD_MONTH' in future_row.columns:
+                future_row['PERIOD_MONTH'] = current_date.month
+            if 'year' in future_row.columns:
+                future_row['year'] = current_date.year
+            if 'month' in future_row.columns:
+                future_row['month'] = current_date.month
+            if 'quarter' in future_row.columns:
+                future_row['quarter'] = (current_date.month - 1) // 3 + 1
+            
+            # Update lag features conservatively
             if i == 0:
-                # First prediction uses last actual value
-                lag_1 = df_extended['MONTHLY_ACTUAL'].iloc[-1]
+                last_value = df_extended['MONTHLY_ACTUAL'].iloc[-1]
             else:
-                # Subsequent predictions use previous prediction as lag
-                lag_1 = predictions[i-1]
+                last_value = predictions[i-1]
             
-            future_row['lag_1'] = lag_1
+            # Update common lag features if they exist
+            for lag_col in ['m_act_lag1', 'lag_1', 'MONTHLY_ACTUAL_lag1']:
+                if lag_col in future_row.columns:
+                    future_row[lag_col] = last_value
             
-            # Rolling features - use last 12 actual values + predictions so far
-            if i == 0:
-                recent_values = df_extended['MONTHLY_ACTUAL'].iloc[-12:].tolist()
-            else:
-                # Combine recent actuals with predictions
-                actuals_needed = max(0, 12 - len(predictions))
-                if actuals_needed > 0:
-                    recent_actuals = df_extended['MONTHLY_ACTUAL'].iloc[-actuals_needed:].tolist()
-                    recent_values = recent_actuals + predictions[:i]
-                else:
-                    recent_values = predictions[i-12:i]
+            # Update rolling means safely
+            recent_values = df_extended['MONTHLY_ACTUAL'].iloc[-12:].tolist() + predictions[:i]
+            recent_12 = recent_values[-12:]  # Last 12 values
             
-            future_row['rolling_mean_12'] = np.mean(recent_values)
+            for rolling_col in ['rolling_mean_12', 'MONTHLY_ACTUAL_rolling_12', 'm_act_rolling_12']:
+                if rolling_col in future_row.columns:
+                    future_row[rolling_col] = np.mean(recent_12)
             
-            # Trend features - calculate trend from recent data
-            if len(recent_values) >= 3:
-                x_vals = np.arange(len(recent_values))
-                trend_slope = np.polyfit(x_vals, recent_values, 1)[0]
-                future_row['trend_slope'] = trend_slope
-            else:
-                future_row['trend_slope'] = 0
-            
-            # Seasonal features
-            future_row['month_sin'] = np.sin(2 * np.pi * current_date.month / 12)
-            future_row['month_cos'] = np.cos(2 * np.pi * current_date.month / 12)
-            
-            # Fill any missing features with last known values
-            for col in feature_cols:
-                if col not in future_row.columns:
-                    if col in df_extended.columns:
-                        future_row[col] = df_extended[col].iloc[-1]
-                    else:
-                        future_row[col] = 0  # Default value
-            
-            # Ensure we have all required features
+            # Make prediction with extensive error checking
             try:
-                X_pred = future_row[feature_cols]
-                base_pred = model.predict(X_pred)[0]
-                
-                # Fix for Linear Regression/Ridge models that produce extreme values
-                historical_mean = df_extended['MONTHLY_ACTUAL'].mean()
-                historical_std = df_extended['MONTHLY_ACTUAL'].std()
-                historical_max = df_extended['MONTHLY_ACTUAL'].max()
-                historical_min = df_extended['MONTHLY_ACTUAL'].min()
-                
-                # Check if prediction is unrealistic (more than 10x historical max or negative)
-                if abs(base_pred) > 10 * historical_max or base_pred < 0 or np.isnan(base_pred) or np.isinf(base_pred):
-                    # Use a more conservative prediction based on recent trend
-                    if model_name.lower() in ['linearregression', 'ridge']:
-                        # For problematic linear models, use a simple trend extrapolation
-                        recent_trend = np.mean(df_extended['MONTHLY_ACTUAL'].iloc[-6:]) if len(df_extended) >= 6 else historical_mean
-                        base_pred = recent_trend * (1 + np.random.normal(0, 0.05))  # Small random variation
+                # Ensure all features exist and align properly
+                X_pred = pd.DataFrame()
+                for col in feature_cols:
+                    if col in future_row.columns:
+                        X_pred[col] = future_row[col]
                     else:
-                        base_pred = historical_mean * (1 + np.random.normal(0, 0.1))
+                        # Use median value for missing features
+                        if col in df_extended.columns:
+                            X_pred[col] = [df_extended[col].median()]
+                        else:
+                            X_pred[col] = [0]
                 
-                # Apply seasonal and trend variations (but more conservative for linear models)
-                if model_name.lower() in ['linearregression', 'ridge']:
-                    seasonal_strength = 0.05  # Reduced for linear models
-                    noise_factor = 0.03  # Reduced noise
+                # Fill any remaining NaN values
+                X_pred = X_pred.fillna(method='ffill').fillna(0)
+                
+                # Make prediction
+                raw_pred = model.predict(X_pred)[0]
+                
+                # Apply bounds checking
+                if (np.isnan(raw_pred) or np.isinf(raw_pred) or 
+                    raw_pred > upper_bound or raw_pred < lower_bound):
+                    
+                    print(f"⚠️ {model_name} extreme prediction: {raw_pred:.2f} -> using conservative estimate")
+                    # Use conservative prediction based on recent trend
+                    recent_trend = np.mean(df_extended['MONTHLY_ACTUAL'].iloc[-6:])
+                    final_pred = recent_trend
                 else:
-                    seasonal_strength = 0.15  # Normal for other models
-                    noise_factor = 0.08
+                    final_pred = raw_pred
                 
-                seasonal_factor = 1 + seasonal_strength * np.sin(2 * np.pi * current_date.month / 12)
-                
-                # Add trend continuation
-                if len(recent_values) >= 6:
-                    x_vals = np.arange(len(recent_values))
-                    trend_slope = np.polyfit(x_vals[-6:], recent_values[-6:], 1)[0]
-                    # More conservative trend for linear models
-                    trend_multiplier = 0.02 if model_name.lower() in ['linearregression', 'ridge'] else 0.05
-                    trend_factor = 1 + (trend_slope * trend_multiplier * (i + 1))
-                else:
-                    trend_factor = 1
-                
-                # Add realistic noise
-                noise = np.random.normal(0, abs(base_pred) * noise_factor)
-                
-                # Combine all factors
-                final_pred = base_pred * seasonal_factor * trend_factor + noise
-                
-                # Final sanity check: keep within reasonable bounds
-                final_pred = max(0, final_pred)  # Non-negative
-                final_pred = min(final_pred, historical_max * 3)  # Not more than 3x historical max
-                
+                # Apply final bounds and add to predictions
+                final_pred = max(lower_bound, min(upper_bound, final_pred))
                 predictions.append(final_pred)
                 
-            except Exception as e:
-                # Fallback: use trend-based prediction
-                if i == 0:
-                    base_value = df_extended['MONTHLY_ACTUAL'].iloc[-1]
-                else:
-                    base_value = predictions[i-1]
+                if i < 3:  # Debug first few predictions
+                    print(f"  Step {i+1}: {final_pred:.0f}")
                 
-                # Simple trend continuation with seasonal adjustment
-                seasonal_factor = 1 + 0.1 * np.sin(2 * np.pi * current_date.month / 12)
-                trend_pred = base_value * seasonal_factor
-                predictions.append(max(0, trend_pred))
+            except Exception as e:
+                print(f"⚠️ {model_name} prediction error at step {i+1}: {e}")
+                # Fallback: use conservative trend-based prediction
+                if i == 0:
+                    fallback_pred = df_extended['MONTHLY_ACTUAL'].iloc[-1] * 1.02
+                else:
+                    fallback_pred = predictions[i-1] * 1.01
+                
+                fallback_pred = max(lower_bound, min(upper_bound, fallback_pred))
+                predictions.append(fallback_pred)
         
         return pd.DataFrame({
             'Date': dates,
@@ -360,26 +398,44 @@ def main():
     
     # --- Sidebar Controls ---
     st.sidebar.markdown("## ⚙️ Forecast Controls")
+    
+    # Cache refresh button for troubleshooting
+    if st.sidebar.button("🔄 Refresh Models", help="Clear cache and reload models if predictions seem incorrect"):
+        st.cache_data.clear()
+        st.sidebar.success("Cache cleared! Models will reload on next prediction.")
+        st.rerun()
+    
     st.sidebar.markdown("---")
     
     # Data Selection Section
     st.sidebar.markdown("### 📊 Data Selection")
-    available_kpis = sorted(df['INDICATOR_NAME'].unique())
-    selected_kpi = st.sidebar.selectbox(
+    # Clean and sort KPI names properly
+    kpi_names = df['INDICATOR_NAME'].unique()
+    # Remove leading/trailing spaces and sort alphabetically
+    available_kpis = sorted([kpi.strip() for kpi in kpi_names])
+    selected_kpi_clean = st.sidebar.selectbox(
         "Select KPI", 
         available_kpis, 
         index=0,
         help="Choose the Key Performance Indicator to forecast"
     )
+    # Find the original KPI name (with potential spaces) for data filtering
+    selected_kpi = next(kpi for kpi in kpi_names if kpi.strip() == selected_kpi_clean)
     
     kpi_data = df[df['INDICATOR_NAME'] == selected_kpi]
     available_agencies = sorted(kpi_data['AGENCY_NAME'].unique())
-    selected_agency = st.sidebar.selectbox(
-        "Select Agency", 
-        available_agencies, 
-        index=0,
-        help="Select the MTA agency for the chosen KPI"
-    )
+    
+    # Smart agency selection: only show dropdown if multiple agencies available
+    if len(available_agencies) == 1:
+        selected_agency = available_agencies[0]
+        st.sidebar.info(f"📍 **Agency:** {selected_agency}")
+    else:
+        selected_agency = st.sidebar.selectbox(
+            "Select Agency", 
+            available_agencies, 
+            index=0,
+            help=f"Choose from {len(available_agencies)} agencies that have this KPI"
+        )
     
     st.sidebar.markdown("---")
     
@@ -434,7 +490,7 @@ def main():
         model_name = selected_model_name.split(": ")[1]
         if model_name in ml_models:
             model_info = ml_models[model_name]
-            predictions = predict_ml_model(filtered_data, model_info, model_name, periods)
+            predictions = predict_ml_model(filtered_data, model_info, model_name, periods, selected_kpi_clean)
     else: # Time Series
         ts_type = selected_model_name.split(": ")[1].upper()
         if ts_type in ts_models and series_key in ts_models[ts_type]:
