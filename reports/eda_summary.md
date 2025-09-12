@@ -95,3 +95,10 @@ The dataset contains KPIs with vastly different scales:
 
 ## Validation Notes
 *EDA findings validated through comprehensive notebook analysis (notebooks/eda.ipynb) including statistical summaries, visualizations, and data quality assessments. All figures confirmed through direct data analysis.*
+
+
+FYP Supervisor meeting:
+1. dashboard is ok, choose top 5 kpi and explain on them
+2. add context on the shapes/patterns on graphs. people might not know what the pattern means
+3. documentation explain the graphs also
+4. why only forecasting 36 months, why not try for longer (could be a question in presentation later on)
