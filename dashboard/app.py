@@ -261,10 +261,20 @@ def predict_ml_model(df, model_info, model_name, periods=12, kpi_name=""):
                     
                     print(f"⚠️ {model_name} extreme prediction: {raw_pred:.2f} -> using conservative estimate")
                     # Use conservative prediction based on recent trend
-                    recent_trend = np.mean(df_extended['MONTHLY_ACTUAL'].iloc[-6:])
+                    recent_data = df_extended['MONTHLY_ACTUAL'].iloc[-6:]
+                    recent_trend = np.mean(recent_data)
+                    print(f"📊 Recent 6 values: {recent_data.tolist()}")
+                    print(f"📊 Recent trend (mean): {recent_trend:.2f}")
+                    print(f"📊 Bounds: {lower_bound:.2f} - {upper_bound:.2f}")
                     final_pred = recent_trend
                 else:
                     final_pred = raw_pred
+                
+                # Apply enhanced bounds checking for edge cases
+                if final_pred < 0 and lower_bound == 0:
+                    # Special handling for KPIs that can't be negative (rates, counts, etc.)
+                    final_pred = max(historical_mean * 0.5, 0.1)  # Use conservative positive value
+                    print(f"🔧 Applied non-negative constraint: {final_pred:.2f}")
                 
                 # Apply final bounds and add to predictions
                 final_pred = max(lower_bound, min(upper_bound, final_pred))
