@@ -418,9 +418,12 @@ def main():
     with col2:
         st.metric("🥈 XGBoost", "39,885 MAE", "+192% vs RF")
     with col3:
-        st.metric("🥉 Ridge Regression", "96,886 MAE", "+610% vs RF")
+        st.metric("🥉 LinearRegression", "130,912 MAE", "+860% vs RF")
     with col4:
         st.metric("📈 Total Models", "267", "3 ML + 264 TS")
+    
+    # Add refresh date
+    st.caption("📅 Performance metrics last updated: September 12, 2025")
 
     st.markdown("---")
     

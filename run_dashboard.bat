@@ -10,9 +10,9 @@ echo   ✅ Ready for Presentation
 echo ========================================
 echo.
 echo 🔧 Loading optimized models:
-echo    - RandomForest: 13,637 MAE (CHAMPION - 65.8%% better)
-echo    - XGBoost: 39,885 MAE 
-echo    - Ridge Regression: 130,912 MAE
+echo    - RandomForest: 13,637 MAE (CHAMPION - Best Performance)
+echo    - XGBoost: 39,885 MAE (+192%% vs RandomForest)
+echo    - LinearRegression: 130,912 MAE (+860%% vs RandomForest)
 echo    - Time Series: 264 Prophet + SARIMA models
 echo.
 echo 📊 Starting dashboard with clean output...
