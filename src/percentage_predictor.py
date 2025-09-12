@@ -170,17 +170,29 @@ class PercentageKPIPredictor:
         """
         predictions = []
         
+        # Calculate adaptive bounds based on historical data
+        hist_min, hist_max = pattern['min'], pattern['max']
+        hist_range = hist_max - hist_min
+        buffer = max(1.0, hist_range * 0.1)  # At least 1% buffer, or 10% of historical range
+        
+        # Adaptive bounds: allow some expansion beyond historical range
+        adaptive_lower = max(0.0, hist_min - buffer)
+        adaptive_upper = min(100.0, hist_max + buffer)
+        
+        # Use adaptive bounds instead of fixed config bounds
+        effective_bounds = (adaptive_lower, adaptive_upper)
+        
         # Base value calculation
         base_value = pattern['mean']
         if config['lookback_months'] == 6:
             # Use more recent average for responsive models
-            base_value = min(pattern['mean'] * 0.998, 99.5)  # Slight downward bias to avoid clipping
+            base_value = min(pattern['mean'] * 0.998, adaptive_upper - buffer/2)
         elif config['lookback_months'] == 3:
             # Use very recent average for adaptive models  
-            base_value = min(pattern['mean'] * 0.999, 99.7)  # Minimal recent bias
+            base_value = min(pattern['mean'] * 0.999, adaptive_upper - buffer/3)
         else:
             # Conservative approach for other models
-            base_value = min(pattern['mean'] * 0.997, 99.3)
+            base_value = min(pattern['mean'] * 0.997, adaptive_upper - buffer)
         
         # Generate predictions
         for i in range(forecast_months):
@@ -200,8 +212,8 @@ class PercentageKPIPredictor:
             noise = np.random.normal(0, pattern['std'] * config['noise_factor'])
             month_pred += noise
             
-            # Apply bounds
-            lower_bound, upper_bound = config['bounds']
+            # Apply adaptive bounds instead of fixed bounds
+            lower_bound, upper_bound = effective_bounds
             month_pred = np.clip(month_pred, lower_bound, upper_bound)
             
             predictions.append(month_pred)

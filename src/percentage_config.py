@@ -9,6 +9,7 @@ PERCENTAGE_INDICATORS = [
     'completion rate', 
     'availability',
     'on-time',
+    'otp',  # On-Time Performance abbreviation
     'percentage',
     'rate',
     'efficiency', 
@@ -20,9 +21,9 @@ PERCENTAGE_INDICATORS = [
 
 # Statistical thresholds for percentage detection
 PERCENTAGE_DETECTION_THRESHOLDS = {
-    'min_value': 50.0,      # Minimum value to consider percentage range
+    'min_value': 25.0,      # Minimum value to consider percentage range (lowered for transit OTP)
     'max_value': 100.0,     # Maximum value for percentage range  
-    'max_std': 10.0,        # Maximum standard deviation for low variance
+    'max_std': 15.0,        # Maximum standard deviation for low variance (increased for seasonal variation)
     'min_samples': 5        # Minimum samples needed for reliable detection
 }
 

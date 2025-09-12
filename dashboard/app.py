@@ -189,16 +189,31 @@ def predict_ml_model(df, model_info, model_name, periods=12, kpi_name=""):
             if 'quarter' in future_row.columns:
                 future_row['quarter'] = (current_date.month - 1) // 3 + 1
             
-            # Update lag features conservatively
+            # Update lag features with proper historical context
             if i == 0:
                 last_value = df_extended['MONTHLY_ACTUAL'].iloc[-1]
             else:
                 last_value = predictions[i-1]
             
-            # Update common lag features if they exist
-            for lag_col in ['m_act_lag1', 'lag_1', 'MONTHLY_ACTUAL_lag1']:
+            # Get extended historical context for longer lags
+            all_historical = df_extended['MONTHLY_ACTUAL'].tolist() + predictions[:i]
+            
+            # Update all lag features properly
+            lag_mappings = {
+                'm_act_lag1': 1, 'lag_1': 1, 'MONTHLY_ACTUAL_lag1': 1,
+                'm_act_lag2': 2, 'lag_2': 2, 'MONTHLY_ACTUAL_lag2': 2,
+                'm_act_lag3': 3, 'lag_3': 3, 'MONTHLY_ACTUAL_lag3': 3,
+                'm_act_lag6': 6, 'lag_6': 6, 'MONTHLY_ACTUAL_lag6': 6,
+                'm_act_lag12': 12, 'lag_12': 12, 'MONTHLY_ACTUAL_lag12': 12
+            }
+            
+            for lag_col, lag_periods in lag_mappings.items():
                 if lag_col in future_row.columns:
-                    future_row[lag_col] = last_value
+                    if len(all_historical) >= lag_periods:
+                        future_row[lag_col] = all_historical[-lag_periods]
+                    else:
+                        # Fallback to last available value
+                        future_row[lag_col] = all_historical[0] if all_historical else last_value
             
             # Update rolling means safely
             recent_values = df_extended['MONTHLY_ACTUAL'].iloc[-12:].tolist() + predictions[:i]
@@ -227,6 +242,18 @@ def predict_ml_model(df, model_info, model_name, periods=12, kpi_name=""):
                 
                 # Make prediction
                 raw_pred = model.predict(X_pred)[0]
+                
+                # Add controlled variation for overly stable models
+                if model_name in ['RandomForest', 'XGBoost']:
+                    # Calculate historical month-to-month volatility
+                    historical_values = df_extended['MONTHLY_ACTUAL'].values
+                    monthly_changes = np.diff(historical_values)
+                    volatility = np.std(monthly_changes) * 0.3  # Use 30% of historical volatility
+                    
+                    # Add small random variation to prevent overly smooth predictions
+                    np.random.seed(42 + i)  # Reproducible randomness
+                    variation = np.random.normal(0, volatility)
+                    raw_pred = raw_pred + variation
                 
                 # Apply bounds checking
                 if (np.isnan(raw_pred) or np.isinf(raw_pred) or 
