@@ -4,9 +4,7 @@ REM Optimized ML Models with Hyperparameter Tuning
 
 echo.
 echo ========================================
-echo   🎓 FYP 2025 - MTA KPI Analytics
-echo   🚀 Optimized ML Dashboard
-echo   ✅ Ready for Presentation
+echo  FYP - MTA KPI Analytics
 echo ========================================
 echo.
 echo 🔧 Loading optimized models:
@@ -29,4 +27,3 @@ cd /d "%~dp0"
 streamlit run dashboard/app.py --server.port 8501 2>nul
 
 pause
- 

@@ -4,7 +4,21 @@ This project predicts and analyzes monthly KPIs from the **MTA_Performance_Agenc
 - **Track A:** Per-series time-series (Prophet / SARIMA)  
 - **Track B:** Multivariate ML (RandomForest / XGBoost / Linear) with specialized percentage KPI handling
 
-## 🔧 **NEW: Specialized Percentage KPI Prediction**
+## � **Rigorous Model Evaluation & Statistical Validation**
+
+**Statistical Evidence for Performance Claims**: All model performance claims are now backed by rigorous time-based cross-validation and statistical testing.
+
+**🎯 Key Validation Results:**
+- **Time-based CV**: No data leakage, expanding window validation
+- **Statistical Tests**: Paired t-tests, Wilcoxon signed-rank tests, confidence intervals
+- **Per-Series Analysis**: Individual KPI performance distributions (not just overall means)
+- **Claim Validation**: Direct statistical testing of stated performance metrics
+
+**📋 Complete Evaluation Framework**: [`notebooks/model_evaluation_methodology.ipynb`](notebooks/model_evaluation_methodology.ipynb)
+
+This comprehensive evaluation addresses the critical gap between technical implementation and statistical evidence, providing the rigorous foundation needed for academic credibility.
+
+## �🔧 **NEW: Specialized Percentage KPI Prediction**
 
 For percentage-based KPIs (like completion rates), this project now includes a specialized prediction system that addresses fundamental issues with applying general ML models to bounded operational metrics.
 

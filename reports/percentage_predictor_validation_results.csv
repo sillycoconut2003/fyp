@@ -1,0 +1,46 @@
+kpi_name,model_type,model_name,mae,rmse,n_test,predictions_bounded,config_description
+Collisions with Injury Rate,Vanilla_ML,Vanilla_RandomForest,0.00891791065416068,0.014153223889868085,6,100.0,Pure ML without domain constraints
+Collisions with Injury Rate,Vanilla_ML,Vanilla_XGBoost,0.03492830236752831,0.045529511169154435,6,100.0,Pure ML without domain constraints
+Collisions with Injury Rate,Vanilla_ML,Vanilla_LinearRegression,0.013786444243719184,0.017146797508436968,6,100.0,Pure ML without domain constraints
+Collisions with Injury Rate,Percentage_Predictor,Full_Percentage_Predictor,0.1958382747439281,0.24468371431146957,6,100.0,Complete percentage predictor with all heuristics
+Collisions with Injury Rate,Percentage_Predictor,No_Bounds,0.2145242896738748,0.26675183285775855,6,100.0,"Remove percentage bounds [0,100]"
+Collisions with Injury Rate,Percentage_Predictor,No_Trend_Weight,0.1857983331791456,0.21416384743315922,6,100.0,Remove trend weighting heuristic
+Collisions with Injury Rate,Percentage_Predictor,No_Noise,0.18682841829852492,0.23786165936901923,6,100.0,Remove noise/randomness component
+Collisions with Injury Rate,Percentage_Predictor,No_Seasonal,0.2764153477214084,0.35609377867299974,6,100.0,Remove seasonal adjustments
+Collisions with Injury Rate,Percentage_Predictor,Minimal_Heuristics,0.2764153477214084,0.35609377867299974,6,100.0,Minimal heuristics (closest to vanilla ML)
+Employee Lost Time Rate,Vanilla_ML,Vanilla_RandomForest,0.7595636544011547,1.6915347467413575,6,100.0,Pure ML without domain constraints
+Employee Lost Time Rate,Vanilla_ML,Vanilla_XGBoost,0.7515689690907795,1.233844558676493,6,100.0,Pure ML without domain constraints
+Employee Lost Time Rate,Vanilla_ML,Vanilla_LinearRegression,1.366091013314474,1.7427078975857722,6,100.0,Pure ML without domain constraints
+Employee Lost Time Rate,Percentage_Predictor,Full_Percentage_Predictor,3.615937138573725,4.276618822415234,6,100.0,Complete percentage predictor with all heuristics
+Employee Lost Time Rate,Percentage_Predictor,No_Bounds,3.936378534527332,4.440504093853481,6,100.0,"Remove percentage bounds [0,100]"
+Employee Lost Time Rate,Percentage_Predictor,No_Trend_Weight,3.494489330334941,4.301264073201658,6,100.0,Remove trend weighting heuristic
+Employee Lost Time Rate,Percentage_Predictor,No_Noise,3.6500176504236066,4.301262833472143,6,100.0,Remove noise/randomness component
+Employee Lost Time Rate,Percentage_Predictor,No_Seasonal,3.8075889135357763,5.092601880325297,6,100.0,Remove seasonal adjustments
+Employee Lost Time Rate,Percentage_Predictor,Minimal_Heuristics,3.8075889135357763,5.092601880325297,6,100.0,Minimal heuristics (closest to vanilla ML)
+Employee Lost Time and Restricted Duty Rate,Vanilla_ML,Vanilla_RandomForest,0.014789954212454104,0.017524742619997844,6,100.0,Pure ML without domain constraints
+Employee Lost Time and Restricted Duty Rate,Vanilla_ML,Vanilla_XGBoost,0.06970634142557786,0.07795018205276337,6,100.0,Pure ML without domain constraints
+Employee Lost Time and Restricted Duty Rate,Vanilla_ML,Vanilla_LinearRegression,0.11417934276963426,0.1295342081221618,6,100.0,Pure ML without domain constraints
+Employee Lost Time and Restricted Duty Rate,Percentage_Predictor,Full_Percentage_Predictor,1.0282793955479033,1.101827378274365,6,100.0,Complete percentage predictor with all heuristics
+Employee Lost Time and Restricted Duty Rate,Percentage_Predictor,No_Bounds,1.0533760568105375,1.09371667613541,6,100.0,"Remove percentage bounds [0,100]"
+Employee Lost Time and Restricted Duty Rate,Percentage_Predictor,No_Trend_Weight,0.8157955768835324,0.8410690380761201,6,100.0,Remove trend weighting heuristic
+Employee Lost Time and Restricted Duty Rate,Percentage_Predictor,No_Noise,1.0250259977042597,1.098230034798966,6,100.0,Remove noise/randomness component
+Employee Lost Time and Restricted Duty Rate,Percentage_Predictor,No_Seasonal,1.2512753889588701,1.2984822982911557,6,100.0,Remove seasonal adjustments
+Employee Lost Time and Restricted Duty Rate,Percentage_Predictor,Minimal_Heuristics,1.2512753889588701,1.2984822982911557,6,100.0,Minimal heuristics (closest to vanilla ML)
+Reportable Customer Injury Rate,Vanilla_ML,Vanilla_RandomForest,0.8173253126503113,1.794179707565516,6,100.0,Pure ML without domain constraints
+Reportable Customer Injury Rate,Vanilla_ML,Vanilla_XGBoost,0.8432066957155864,1.6421381455198245,6,100.0,Pure ML without domain constraints
+Reportable Customer Injury Rate,Vanilla_ML,Vanilla_LinearRegression,0.3864823080866893,0.468103723036917,6,100.0,Pure ML without domain constraints
+Reportable Customer Injury Rate,Percentage_Predictor,Full_Percentage_Predictor,3.3990791068387503,4.757908464846423,6,100.0,Complete percentage predictor with all heuristics
+Reportable Customer Injury Rate,Percentage_Predictor,No_Bounds,3.638290527222383,4.9538667530290965,6,100.0,"Remove percentage bounds [0,100]"
+Reportable Customer Injury Rate,Percentage_Predictor,No_Trend_Weight,3.0658346089402806,4.244198088434779,6,100.0,Remove trend weighting heuristic
+Reportable Customer Injury Rate,Percentage_Predictor,No_Noise,3.431284364980279,4.731558287795481,6,100.0,Remove noise/randomness component
+Reportable Customer Injury Rate,Percentage_Predictor,No_Seasonal,3.4410947208013822,4.643129920646832,6,100.0,Remove seasonal adjustments
+Reportable Customer Injury Rate,Percentage_Predictor,Minimal_Heuristics,3.4410947208013822,4.643129920646832,6,100.0,Minimal heuristics (closest to vanilla ML)
+On-Time Performance,Vanilla_ML,Vanilla_RandomForest,0.07510670634919119,0.0929550552701798,6,100.0,Pure ML without domain constraints
+On-Time Performance,Vanilla_ML,Vanilla_XGBoost,0.15521011352539205,0.24592840636705313,6,100.0,Pure ML without domain constraints
+On-Time Performance,Vanilla_ML,Vanilla_LinearRegression,0.01079690878878381,0.015069849829545517,6,100.0,Pure ML without domain constraints
+On-Time Performance,Percentage_Predictor,Full_Percentage_Predictor,1.5349438231342702,1.9944769495456913,6,100.0,Complete percentage predictor with all heuristics
+On-Time Performance,Percentage_Predictor,No_Bounds,8.576166952638955,10.35387309903066,6,83.33333333333334,"Remove percentage bounds [0,100]"
+On-Time Performance,Percentage_Predictor,No_Trend_Weight,1.096213408604844,1.6108242384224372,6,100.0,Remove trend weighting heuristic
+On-Time Performance,Percentage_Predictor,No_Noise,1.5349438231342631,1.9443343073471842,6,100.0,Remove noise/randomness component
+On-Time Performance,Percentage_Predictor,No_Seasonal,11.064683140580167,17.2414182583405,6,100.0,Remove seasonal adjustments
+On-Time Performance,Percentage_Predictor,Minimal_Heuristics,11.064683140580167,17.2414182583405,6,100.0,Minimal heuristics (closest to vanilla ML)
