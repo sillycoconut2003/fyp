@@ -1,89 +1,185 @@
-/* Futuristic Dark Theme for Streamlit Dashboard */
+/* Professional Dark Theme with Apple-first font stack */
+
+/* --- Design Tokens --- */
+:root {
+  /* Colors (professional dark) */
+  --bg: #0f1419;
+  --card: #1a1f26;
+  --text: #f8fafc;
+  --muted: #94a3b8;
+  --border: #334155;
+  --accent: #3b82f6; /* Professional Blue */
+  --accent-600: #2563eb;
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+
+  /* Shadows (refined) */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.25);
+
+  /* Radius & Spacing */
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Typography Scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+}
 
 /* --- Base & Fonts --- */
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
-
-body {
-    font-family: 'Roboto', sans-serif;
-    color: #E0E0E0; /* Light grey text */
+html, body, .stApp {
+    background: var(--bg) !important;
+    color: var(--text) !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+    font-variant-numeric: tabular-nums;
 }
+
+/* Enable optical sizing for SF Pro where supported */
+* { font-optical-sizing: auto; }
 
 /* --- Main App Container --- */
 .main .block-container {
-    padding-top: 2rem;
-    padding-bottom: 2rem;
-    padding-left: 5rem;
-    padding-right: 5rem;
+    padding: var(--space-8) var(--space-8) var(--space-6) var(--space-8);
 }
 
 /* --- Sidebar --- */
 [data-testid="stSidebar"] {
-    background-color: #1E1E1E; /* Slightly lighter than main background */
-    border-right: 1px solid #4A4A4A;
+    background: #0f1013;
+    border-right: 1px solid var(--border);
 }
-
-[data-testid="stSidebar"] h2 {
-    color: #00A2FF; /* Bright blue for header */
-    font-weight: 700;
-}
+[data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 { color: var(--text); }
 
 /* --- Headers & Titles --- */
-h1, h2, h3 {
-    color: #FFFFFF;
+h1, h2, h3, h4 {
+    color: var(--text);
     font-weight: 700;
+    letter-spacing: -0.01em;
 }
 
-h1 {
-    color: #00A2FF; /* Main title color */
+.header-title { 
+  font-size: var(--text-3xl); 
+  font-weight: 800; 
+  color: var(--text); 
+  margin: 0 0 var(--space-2) 0; 
+  letter-spacing: -0.025em;
+}
+.header-subtitle { 
+  font-size: var(--text-lg); 
+  color: var(--muted); 
+  margin-top: 0; 
+  font-weight: 400;
 }
 
-/* --- Metric Cards --- */
-[data-testid="stMetric"] {
-    background-color: #2A2A2A;
-    border: 1px solid #4A4A4A;
-    border-radius: 10px;
-    padding: 15px;
-    text-align: center;
+/* --- Stat Cards --- */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-6);
+  margin: var(--space-8) 0 var(--space-6);
 }
 
-[data-testid="stMetricLabel"] {
-    font-size: 1rem;
-    color: #B0B0B0; /* Dimmer label */
-}
+@media (max-width: 1200px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .stat-grid { grid-template-columns: 1fr; } }
 
-[data-testid="stMetricValue"] {
-    font-size: 2.2rem;
-    font-weight: 700;
-    color: #FFFFFF;
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-6);
+  transition: all 0.2s ease;
 }
+.stat-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+}
+.stat-title {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  margin-bottom: var(--space-3);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.stat-value {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+.stat-delta {
+  font-size: var(--text-sm);
+  margin-top: var(--space-3);
+  color: var(--muted);
+  display: inline-block;
+  padding: var(--space-1) var(--space-3);
+  border-radius: 9999px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  font-weight: 500;
+}
+.delta-up { color: var(--success) !important; background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.3); }
+.delta-down { color: var(--danger) !important; background: rgba(239,68,68,0.1); border-color: rgba(231, 74, 74, 0.3); }
+.delta-neutral { color: var(--muted); }
 
-[data-testid="stMetricDelta"] {
-    font-size: 1rem;
-    font-weight: 400;
+/* --- Panels --- */
+.panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); padding: var(--space-5); margin-bottom: var(--space-6); }
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-3);
 }
+.panel-title { font-size: 1.1rem; font-weight: 700; }
+.panel-subtitle { color: var(--muted); font-size: 0.95rem; }
 
 /* --- Tabs --- */
 [data-testid="stTabs"] button {
-    color: #B0B0B0;
-    font-size: 1.1rem;
+    color: var(--muted);
+    font-size: 1rem;
+    font-weight: 500;
+    padding-bottom: 8px;
+    transition: all 0.2s ease;
 }
-
 [data-testid="stTabs"] button[aria-selected="true"] {
-    color: #00A2FF;
-    border-bottom: 2px solid #00A2FF;
+    color: var(--text);
+    font-weight: 600;
+}
+[data-testid="stTabs"] button:hover:not([aria-selected="true"]) {
+    color: #e2e8f0;
 }
 
-/* --- Custom HTML for Header --- */
-.header-title {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: #00A2FF;
-    padding-bottom: 0;
-    margin-bottom: 0;
+/* Override Streamlit's default red tab highlight */
+[data-baseweb="tab-highlight"] {
+    background-color: var(--success) !important;
 }
 
-.header-subtitle {
-    font-size: 1.2rem;
-    color: #E0E0E0;
-    padding-top: 0;
-}
+/* --- Tables --- */
+.stDataFrame, .stTable { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+
+/* --- Plotly tweaks --- */
+.js-plotly-plot .plotly .main-svg { border-radius: var(--radius-sm); }
+
+/* Fix code-like rendering if HTML appears */
+.element-container pre { background: transparent !important; color: var(--text) !important; }
+
