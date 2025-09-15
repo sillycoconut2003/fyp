@@ -91,9 +91,93 @@ def split_data_temporal(df, feature_cols, target_col, test_size=0.2):
     
     return X_train, X_test, y_train, y_test, train_df, test_df
 
-def train_random_forest(X_train, y_train, X_test, y_test):
+def train_random_forest_baseline(X_train, y_train, X_test, y_test):
     """
-    Train RandomForest model optimized for MTA KPI prediction.
+    Train RandomForest model with DEFAULT parameters first to establish baseline.
+    
+    Args:
+        X_train, y_train: Training features and target
+        X_test, y_test: Test features and target for final evaluation
+        
+    Returns:
+        dict: Model results including trained model, metrics, and predictions
+    """
+    print("\n" + "="*60)
+    print("TRAINING RANDOM FOREST MODEL (BASELINE - DEFAULT PARAMETERS)")
+    print("="*60)
+    print("Configuration: Default parameters, 10-fold CV")
+    
+    # Default RandomForest configuration
+    model = RandomForestRegressor(
+        random_state=42,        # Reproducibility
+        n_jobs=-1,             # Use all CPU cores
+        verbose=1              # Show training progress
+    )
+    
+    # Robust time series cross-validation
+    print("\nPerforming 10-fold time series cross-validation...")
+    tscv = TimeSeriesSplit(n_splits=10)
+    cv_scores = []
+    
+    for fold, (train_idx, val_idx) in enumerate(tscv.split(X_train), 1):
+        print(f"Fold {fold}/10: Training on {len(train_idx)} samples, validating on {len(val_idx)} samples")
+        
+        # Split data for current fold
+        X_train_fold = X_train.iloc[train_idx]
+        X_val_fold = X_train.iloc[val_idx]
+        y_train_fold = y_train.iloc[train_idx]
+        y_val_fold = y_train.iloc[val_idx]
+        
+        # Train and evaluate fold
+        model.fit(X_train_fold, y_train_fold)
+        pred_fold = model.predict(X_val_fold)
+        fold_mae = mae(y_val_fold, pred_fold)
+        cv_scores.append(fold_mae)
+        
+        print(f"  Fold {fold} MAE: {fold_mae:.2f}")
+    
+    # Calculate cross-validation performance
+    cv_score = np.mean(cv_scores)
+    cv_std = np.std(cv_scores)
+    print(f"\nCross-Validation Results:")
+    print(f"  Mean MAE: {cv_score:.2f} (±{cv_std:.2f})")
+    
+    # Train final model on full training set
+    print("\nTraining final model on complete training set...")
+    model.fit(X_train, y_train)
+    
+    # Evaluate on test set
+    y_pred = model.predict(X_test)
+    test_mae = mae(y_test, y_pred)
+    test_rmse = rmse(y_test, y_pred)
+    test_mape = mape(y_test, y_pred)
+    
+    # Compile comprehensive results
+    results = {
+        'model': model,
+        'cv_mae': cv_score,
+        'cv_std': cv_std,
+        'test_mae': test_mae,
+        'test_rmse': test_rmse,
+        'test_mape': test_mape,
+        'predictions': y_pred,
+        'cv_scores': cv_scores,
+        'model_type': 'RandomForest_Baseline'
+    }
+    
+    # Display final performance metrics
+    print(f"\nBaseline Model Performance:")
+    print(f"  Cross-Validation MAE: {cv_score:.2f} (±{cv_std:.2f})")
+    print(f"  Test MAE: {test_mae:.2f}")
+    print(f"  Test RMSE: {test_rmse:.2f}")
+    print(f"  Test MAPE: {test_mape:.2f}%")
+    print("="*60)
+    
+    return results
+
+def train_random_forest_tuned(X_train, y_train, X_test, y_test):
+    """
+    Train RandomForest model with OPTIMIZED hyperparameters for comparison.
     
     Uses optimal hyperparameters discovered through extensive tuning:
     - 500 trees for stable predictions
@@ -108,7 +192,7 @@ def train_random_forest(X_train, y_train, X_test, y_test):
         dict: Model results including trained model, metrics, and predictions
     """
     print("\n" + "="*60)
-    print("TRAINING RANDOM FOREST MODEL")
+    print("TRAINING RANDOM FOREST MODEL (TUNED - OPTIMIZED PARAMETERS)")
     print("="*60)
     print("Configuration: 500 trees, max_depth=15, 10-fold CV")
     
@@ -172,11 +256,12 @@ def train_random_forest(X_train, y_train, X_test, y_test):
         'test_rmse': test_rmse,
         'test_mape': test_mape,
         'predictions': y_pred,
-        'cv_scores': cv_scores
+        'cv_scores': cv_scores,
+        'model_type': 'RandomForest_Tuned'
     }
     
     # Display final performance metrics
-    print(f"\nFinal Model Performance:")
+    print(f"\nTuned Model Performance:")
     print(f"  Cross-Validation MAE: {cv_score:.2f} (±{cv_std:.2f})")
     print(f"  Test MAE: {test_mae:.2f}")
     print(f"  Test RMSE: {test_rmse:.2f}")
@@ -185,9 +270,105 @@ def train_random_forest(X_train, y_train, X_test, y_test):
     
     return results
 
-def train_xgboost(X_train, y_train, X_test, y_test):
+def train_xgboost_baseline(X_train, y_train, X_test, y_test):
     """
-    Train XGBoost model with optimized hyperparameters for MTA KPI prediction.
+    Train XGBoost model with DEFAULT parameters first to establish baseline.
+    
+    Args:
+        X_train, y_train: Training features and target
+        X_test, y_test: Test features and target for final evaluation
+        
+    Returns:
+        dict: Model results including trained model, metrics, and predictions
+    """
+    print("\n" + "="*60)
+    print("TRAINING XGBOOST MODEL (BASELINE - DEFAULT PARAMETERS)")
+    print("="*60)
+    print("Configuration: Default parameters, 5-fold CV")
+    
+    # Default XGBoost configuration
+    model = xgb.XGBRegressor(
+        random_state=42,         # Reproducibility
+        n_jobs=-1,              # Use all CPU cores
+        verbosity=1             # Show training progress
+    )
+    
+    # Time series cross-validation
+    print("\nPerforming 5-fold time series cross-validation...")
+    tscv = TimeSeriesSplit(n_splits=5)
+    cv_scores = []
+    
+    for fold, (train_idx, val_idx) in enumerate(tscv.split(X_train), 1):
+        print(f"Fold {fold}/5: Training on {len(train_idx)} samples, validating on {len(val_idx)} samples")
+        
+        # Split data for current fold
+        X_train_fold = X_train.iloc[train_idx]
+        X_val_fold = X_train.iloc[val_idx]
+        y_train_fold = y_train.iloc[train_idx]
+        y_val_fold = y_train.iloc[val_idx]
+        
+        # Create and train XGBoost model
+        fold_model = xgb.XGBRegressor(
+            random_state=42,
+            n_jobs=-1,
+            verbosity=0  # Quiet during CV
+        )
+        
+        # Train and evaluate fold
+        fold_model.fit(X_train_fold, y_train_fold)
+        pred_fold = fold_model.predict(X_val_fold)
+        fold_mae = mae(y_val_fold, pred_fold)
+        cv_scores.append(fold_mae)
+        
+        print(f"  Fold {fold} MAE: {fold_mae:.2f}")
+    
+    # Calculate cross-validation performance
+    cv_score = np.mean(cv_scores)
+    cv_std = np.std(cv_scores)
+    print(f"\nCross-Validation Results:")
+    print(f"  Mean MAE: {cv_score:.2f} (±{cv_std:.2f})")
+    
+    # Train final model on full training set
+    print("\nTraining final model on complete training set...")
+    final_model = xgb.XGBRegressor(
+        random_state=42,
+        n_jobs=-1,
+        verbosity=1
+    )
+    final_model.fit(X_train, y_train)
+    
+    # Evaluate on test set
+    y_pred = final_model.predict(X_test)
+    test_mae = mae(y_test, y_pred)
+    test_rmse = rmse(y_test, y_pred)
+    test_mape = mape(y_test, y_pred)
+    
+    # Compile comprehensive results
+    results = {
+        'model': final_model,
+        'cv_mae': cv_score,
+        'cv_std': cv_std,
+        'test_mae': test_mae,
+        'test_rmse': test_rmse,
+        'test_mape': test_mape,
+        'predictions': y_pred,
+        'cv_scores': cv_scores,
+        'model_type': 'XGBoost_Baseline'
+    }
+    
+    # Display final performance metrics
+    print(f"\nBaseline Model Performance:")
+    print(f"  Cross-Validation MAE: {cv_score:.2f} (±{cv_std:.2f})")
+    print(f"  Test MAE: {test_mae:.2f}")
+    print(f"  Test RMSE: {test_rmse:.2f}")
+    print(f"  Test MAPE: {test_mape:.2f}%")
+    print("="*60)
+    
+    return results
+
+def train_xgboost_tuned(X_train, y_train, X_test, y_test):
+    """
+    Train XGBoost model with OPTIMIZED hyperparameters for comparison.
     
     Uses extensively tuned parameters for optimal performance:
     - 400 trees with controlled depth and learning rate
@@ -202,7 +383,7 @@ def train_xgboost(X_train, y_train, X_test, y_test):
         dict: Model results including trained model, metrics, and predictions
     """
     print("\n" + "="*60)
-    print("TRAINING XGBOOST MODEL")
+    print("TRAINING XGBOOST MODEL (TUNED - OPTIMIZED PARAMETERS)")
     print("="*60)
     print("Configuration: 400 trees, max_depth=12, learning_rate=0.12")
     
@@ -272,11 +453,12 @@ def train_xgboost(X_train, y_train, X_test, y_test):
         'test_rmse': test_rmse,
         'test_mape': test_mape,
         'predictions': y_pred,
-        'cv_scores': cv_scores
+        'cv_scores': cv_scores,
+        'model_type': 'XGBoost_Tuned'
     }
     
     # Display final performance metrics
-    print(f"\nFinal Model Performance:")
+    print(f"\nTuned Model Performance:")
     print(f"  Cross-Validation MAE: {cv_score:.2f} (±{cv_std:.2f})")
     print(f"  Test MAE: {test_mae:.2f}")
     print(f"  Test RMSE: {test_rmse:.2f}")
@@ -285,12 +467,9 @@ def train_xgboost(X_train, y_train, X_test, y_test):
     
     return results
 
-def train_linear_regression(X_train, y_train, X_test, y_test):
+def train_linear_regression_baseline(X_train, y_train, X_test, y_test):
     """
-    Train Ridge Regression with automated alpha optimization.
-    
-    Uses StandardScaler preprocessing and cross-validation to find optimal
-    regularization parameter. Provides quick baseline performance for comparison.
+    Train Ridge Regression with DEFAULT parameters first to establish baseline.
     
     Args:
         X_train, y_train: Training features and target
@@ -300,7 +479,95 @@ def train_linear_regression(X_train, y_train, X_test, y_test):
         dict: Model results including trained model, metrics, and predictions
     """
     print("\n" + "="*60)
-    print("TRAINING RIDGE REGRESSION MODEL")
+    print("TRAINING RIDGE REGRESSION MODEL (BASELINE - DEFAULT PARAMETERS)")
+    print("="*60)
+    print("Configuration: StandardScaler + Ridge with alpha=1.0")
+    
+    # Default Ridge configuration with preprocessing
+    model = Pipeline([
+        ('scaler', StandardScaler()),
+        ('ridge', Ridge(random_state=42))  # Default alpha=1.0
+    ])
+    
+    # Time series cross-validation
+    tscv = TimeSeriesSplit(n_splits=5)
+    cv_scores = []
+    
+    print("\nPerforming 5-fold time series cross-validation...")
+    for fold, (train_idx, val_idx) in enumerate(tscv.split(X_train), 1):
+        print(f"Fold {fold}/5: Training on {len(train_idx)} samples, validating on {len(val_idx)} samples")
+        
+        X_train_fold = X_train.iloc[train_idx]
+        X_val_fold = X_train.iloc[val_idx]
+        y_train_fold = y_train.iloc[train_idx]
+        y_val_fold = y_train.iloc[val_idx]
+        
+        fold_model = Pipeline([
+            ('scaler', StandardScaler()),
+            ('ridge', Ridge(random_state=42))
+        ])
+        fold_model.fit(X_train_fold, y_train_fold)
+        pred_fold = fold_model.predict(X_val_fold)
+        cv_scores.append(mae(y_val_fold, pred_fold))
+        
+        print(f"  Fold {fold} MAE: {cv_scores[-1]:.2f}")
+    
+    cv_score = np.mean(cv_scores)
+    cv_std = np.std(cv_scores)
+    print(f"\nCross-Validation Results:")
+    print(f"  Mean MAE: {cv_score:.2f} (±{cv_std:.2f})")
+    
+    # Train final model on full training set
+    print("\nTraining final model on complete training set...")
+    model.fit(X_train, y_train)
+    
+    # Evaluate on test set
+    y_pred = model.predict(X_test)
+    test_mae = mae(y_test, y_pred)
+    test_rmse = rmse(y_test, y_pred)
+    test_mape = mape(y_test, y_pred)
+    
+    # Compile comprehensive results
+    results = {
+        'model': model,
+        'cv_mae': cv_score,
+        'cv_std': cv_std,
+        'test_mae': test_mae,
+        'test_rmse': test_rmse,
+        'test_mape': test_mape,
+        'predictions': y_pred,
+        'cv_scores': cv_scores,
+        'model_type': 'Ridge_Baseline',
+        'best_alpha': 1.0  # Default alpha
+    }
+    
+    # Display final performance metrics
+    print(f"\nBaseline Model Performance:")
+    print(f"  Default Alpha: 1.0")
+    print(f"  Cross-Validation MAE: {cv_score:.2f} (±{cv_std:.2f})")
+    print(f"  Test MAE: {test_mae:.2f}")
+    print(f"  Test RMSE: {test_rmse:.2f}")
+    print(f"  Test MAPE: {test_mape:.2f}%")
+    print("="*60)
+    
+    return results
+
+def train_linear_regression_tuned(X_train, y_train, X_test, y_test):
+    """
+    Train Ridge Regression with OPTIMIZED alpha parameter for comparison.
+    
+    Uses StandardScaler preprocessing and cross-validation to find optimal
+    regularization parameter. Provides optimized performance for comparison.
+    
+    Args:
+        X_train, y_train: Training features and target
+        X_test, y_test: Test features and target for final evaluation
+        
+    Returns:
+        dict: Model results including trained model, metrics, and predictions
+    """
+    print("\n" + "="*60)
+    print("TRAINING RIDGE REGRESSION MODEL (TUNED - OPTIMIZED ALPHA)")
     print("="*60)
     print("Configuration: StandardScaler + Ridge with alpha optimization")
     
@@ -397,11 +664,12 @@ def train_linear_regression(X_train, y_train, X_test, y_test):
         'test_rmse': test_rmse,
         'test_mape': test_mape,
         'predictions': y_pred,
-        'alpha_results': alpha_results
+        'alpha_results': alpha_results,
+        'model_type': 'Ridge_Tuned'
     }
     
     # Display final performance metrics
-    print(f"\nFinal Model Performance:")
+    print(f"\nTuned Model Performance:")
     print(f"  Best Alpha: {best_alpha}")
     print(f"  Cross-Validation MAE: {cv_score:.2f} (±{cv_std:.2f})")
     print(f"  Test MAE: {test_mae:.2f}")
@@ -410,6 +678,82 @@ def train_linear_regression(X_train, y_train, X_test, y_test):
     print("="*60)
     
     return results
+
+def compare_before_after_models(baseline_results, tuned_results):
+    """
+    Compare baseline (default parameters) vs tuned (optimized parameters) model performance.
+    
+    Args:
+        baseline_results: Dictionary containing baseline model results
+        tuned_results: Dictionary containing tuned model results
+        
+    Returns:
+        pd.DataFrame: Comprehensive comparison results
+    """
+    print("\n" + "="*80)
+    print("BEFORE vs AFTER HYPERPARAMETER TUNING COMPARISON")
+    print("="*80)
+    
+    comparison_data = []
+    
+    # Map model names between baseline and tuned
+    model_mapping = {
+        'RandomForest_Baseline': 'RandomForest_Tuned',
+        'XGBoost_Baseline': 'XGBoost_Tuned', 
+        'Ridge_Baseline': 'Ridge_Tuned'
+    }
+    
+    for baseline_key, tuned_key in model_mapping.items():
+        if baseline_key in baseline_results and tuned_key in tuned_results:
+            baseline = baseline_results[baseline_key]
+            tuned = tuned_results[tuned_key]
+            
+            # Calculate improvements
+            mae_improvement = baseline['test_mae'] - tuned['test_mae']
+            mae_improvement_pct = (mae_improvement / baseline['test_mae']) * 100
+            
+            rmse_improvement = baseline['test_rmse'] - tuned['test_rmse']
+            rmse_improvement_pct = (rmse_improvement / baseline['test_rmse']) * 100
+            
+            r2_improvement = 0  # R² not calculated in current version
+            
+            comparison_data.append({
+                'Model': baseline_key.replace('_Baseline', ''),
+                'Baseline_MAE': baseline['test_mae'],
+                'Tuned_MAE': tuned['test_mae'],
+                'MAE_Improvement': mae_improvement,
+                'MAE_Improvement_%': mae_improvement_pct,
+                'Baseline_RMSE': baseline['test_rmse'],
+                'Tuned_RMSE': tuned['test_rmse'],
+                'RMSE_Improvement': rmse_improvement,
+                'RMSE_Improvement_%': rmse_improvement_pct,
+                'Baseline_MAPE': baseline['test_mape'],
+                'Tuned_MAPE': tuned['test_mape']
+            })
+    
+    comparison_df = pd.DataFrame(comparison_data)
+    
+    # Display detailed comparison
+    print(f"\n📊 COMPREHENSIVE PERFORMANCE COMPARISON:")
+    print("="*50)
+    for _, row in comparison_df.iterrows():
+        print(f"\n🔍 {row['Model']}:")
+        print(f"   📈 MAE: {row['Baseline_MAE']:,.2f} → {row['Tuned_MAE']:,.2f}")
+        print(f"   📊 Improvement: {row['MAE_Improvement']:,.2f} ({row['MAE_Improvement_%']:+.2f}%)")
+        print(f"   📈 RMSE: {row['Baseline_RMSE']:,.2f} → {row['Tuned_RMSE']:,.2f}")
+        print(f"   📊 Improvement: {row['RMSE_Improvement']:,.2f} ({row['RMSE_Improvement_%']:+.2f}%)")
+        print(f"   📈 MAPE: {row['Baseline_MAPE']:.2f}% → {row['Tuned_MAPE']:.2f}%")
+    
+    # Find best improvement
+    if len(comparison_df) > 0:
+        best_model = comparison_df.loc[comparison_df['MAE_Improvement_%'].idxmax()]
+        print(f"\n🏆 BEST IMPROVEMENT: {best_model['Model']}")
+        print(f"   📈 MAE Improvement: {best_model['MAE_Improvement_%']:+.2f}%")
+        print(f"   📊 Final MAE: {best_model['Tuned_MAE']:,.2f}")
+    
+    print("="*80)
+    
+    return comparison_df
 
 def save_ml_models(results_dict, feature_cols):
     """
@@ -507,15 +851,20 @@ def compare_models(results_dict):
 
 def main():
     """
-    Main training pipeline for MTA KPI prediction models.
+    Main training pipeline for MTA KPI prediction models with BEFORE/AFTER comparison.
     
     Executes comprehensive ML training workflow:
     1. Load and prepare data
-    2. Train multiple model types (RandomForest, XGBoost, Ridge)
-    3. Compare performance across models
-    4. Save trained models for deployment
+    2. PHASE 1: Train baseline models (default parameters)
+    3. PHASE 2: Train tuned models (optimized parameters) 
+    4. PHASE 3: Compare before vs after performance improvements
+    5. Save tuned models for deployment
     
-    This is the optimized FYP version with extensive hyperparameter tuning.
+    This demonstrates the impact of hyperparameter tuning by training each model
+    twice - once with defaults and once with optimized parameters.
+    
+    Returns:
+        tuple: (baseline_results, tuned_results, comparison_df)
     """
     print("="*80)
     print("MTA KPI PREDICTION - ML MODEL TRAINING PIPELINE")
@@ -540,47 +889,70 @@ def main():
         )
         print(f"Training set: {len(X_train)} samples | Test set: {len(X_test)} samples")
         
-        # Step 4: Train models with progress tracking
-        print(f"\n🚀 Training optimized ML models...")
-        results = {}
+        # Step 4: Train models with BEFORE/AFTER workflow
+        print(f"\n🚀 Training ML models: BASELINE → TUNING → COMPARISON...")
         
-        # Train RandomForest (current best performer)
-        print(f"\n[1/3] RandomForest with optimal parameters...")
-        results['RandomForest'] = train_random_forest(X_train, y_train, X_test, y_test)
+        # PHASE 1: Train baseline models (default parameters)
+        print(f"\n" + "="*70)
+        print("PHASE 1: BASELINE TRAINING (DEFAULT PARAMETERS)")
+        print("="*70)
+        baseline_results = {}
         
-        # Train XGBoost (competitive alternative)  
-        print(f"\n[2/3] XGBoost with tuned hyperparameters...")
-        results['XGBoost'] = train_xgboost(X_train, y_train, X_test, y_test)
+        print(f"\n[1/3] RandomForest baseline (default parameters)...")
+        baseline_results['RandomForest_Baseline'] = train_random_forest_baseline(X_train, y_train, X_test, y_test)
         
-        # Train Ridge Regression (baseline)
-        print(f"\n[3/3] Ridge Regression with alpha optimization...")
-        results['LinearRegression'] = train_linear_regression(X_train, y_train, X_test, y_test)
+        print(f"\n[2/3] XGBoost baseline (default parameters)...")
+        baseline_results['XGBoost_Baseline'] = train_xgboost_baseline(X_train, y_train, X_test, y_test)
         
-        # Step 5: Comprehensive model comparison
-        print(f"\n📊 Analyzing model performance...")
-        comparison_df = compare_models(results)
+        print(f"\n[3/3] Ridge baseline (default parameters)...")
+        baseline_results['Ridge_Baseline'] = train_linear_regression_baseline(X_train, y_train, X_test, y_test)
         
-        # Step 6: Save trained models
-        print(f"\n💾 Saving models for deployment...")
-        save_ml_models(results, feature_cols)
+        # PHASE 2: Train tuned models (optimized parameters)
+        print(f"\n" + "="*70)
+        print("PHASE 2: HYPERPARAMETER TUNING (OPTIMIZED PARAMETERS)")
+        print("="*70)
+        tuned_results = {}
         
-        # Final summary
-        best_model = comparison_df.iloc[0]['Model']
-        best_mae = comparison_df.iloc[0]['Test_MAE']
+        print(f"\n[1/3] RandomForest tuned (optimized parameters)...")
+        tuned_results['RandomForest_Tuned'] = train_random_forest_tuned(X_train, y_train, X_test, y_test)
         
-        print(f"\n🎉 TRAINING COMPLETED SUCCESSFULLY!")
-        print(f"Best model: {best_model} (MAE: {best_mae:.2f})")
-        print("All models saved and ready for production use.")
+        print(f"\n[2/3] XGBoost tuned (optimized parameters)...")
+        tuned_results['XGBoost_Tuned'] = train_xgboost_tuned(X_train, y_train, X_test, y_test)
+        
+        print(f"\n[3/3] Ridge tuned (optimized parameters)...")
+        tuned_results['Ridge_Tuned'] = train_linear_regression_tuned(X_train, y_train, X_test, y_test)
+        
+        # PHASE 3: Compare baseline vs tuned performance
+        print(f"\n" + "="*70)
+        print("PHASE 3: BEFORE vs AFTER COMPARISON")
+        print("="*70)
+        comparison_df = compare_before_after_models(baseline_results, tuned_results)
+        
+        # Step 5: Save best models (tuned versions for production)
+        print(f"\n💾 Saving tuned models for deployment...")
+        save_ml_models(tuned_results, feature_cols)
+        
+        # Final summary with improvement highlights
+        if len(comparison_df) > 0:
+            best_improvement = comparison_df.loc[comparison_df['MAE_Improvement_%'].idxmax()]
+            best_tuned = min(tuned_results.values(), key=lambda x: x['test_mae'])
+            
+            print(f"\n🎉 BEFORE/AFTER TRAINING COMPLETED SUCCESSFULLY!")
+            print(f"🏆 Best improvement: {best_improvement['Model']} ({best_improvement['MAE_Improvement_%']:+.2f}% MAE)")
+            print(f"🥇 Best final model: {best_tuned['model_type']} (MAE: {best_tuned['test_mae']:.2f})")
+            print("All tuned models saved and ready for production use.")
+        else:
+            print(f"\n🎉 TRAINING COMPLETED!")
+        
         print("="*80)
         
-        return results, comparison_df
-        
+        return baseline_results, tuned_results, comparison_df
     except Exception as e:
         print(f"\n❌ ERROR during training pipeline: {e}")
         raise
     
     print("\nML Training Pipeline Completed!")
-    return results, comparison_df
+    return baseline_results, tuned_results, comparison_df
 
 if __name__ == "__main__":
-    results, comparison = main()
+    baseline_results, tuned_results, comparison = main()
