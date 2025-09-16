@@ -38,8 +38,8 @@ load_css()
 @st.cache_data
 def load_data():
     """Load the processed dataset"""
-    fp = Path(__file__).resolve().parents[1]/"data"/"processed"/"mta_model.parquet"
-    
+    #fp = Path(__file__).resolve().parents[1]/"data"/"processed"/"mta_model.parquet"
+    fp = "../data/processed/mta_model.parquet"
     try:
         return pd.read_parquet(fp)
     except FileNotFoundError:
