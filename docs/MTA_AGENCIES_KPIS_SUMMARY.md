@@ -26,7 +26,7 @@
 
 ---
 
-## 🎯 **DETAILED AGENCY BREAKDOWN**
+## **DETAILED AGENCY BREAKDOWN**
 
 ### **Long Island Rail Road** (18 KPIs)
 **Core Performance KPIs:**

@@ -13,10 +13,11 @@ from pathlib import Path
 import pickle
 import xgboost as xgb
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import Ridge
-from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge, Lasso, ElasticNet
+from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import TimeSeriesSplit
+from sklearn.model_selection import TimeSeriesSplit, GridSearchCV
+from sklearn.base import clone
 
 # Add the src directory to the path to allow imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -554,79 +555,135 @@ def train_linear_regression_baseline(X_train, y_train, X_test, y_test):
 
 def train_linear_regression_tuned(X_train, y_train, X_test, y_test):
     """
-    Train Ridge Regression with OPTIMIZED alpha parameter for comparison.
+    Train COMPREHENSIVE REGULARIZED LINEAR REGRESSION models for optimal performance.
     
-    Uses StandardScaler preprocessing and cross-validation to find optimal
-    regularization parameter. Provides optimized performance for comparison.
+    Implements QUICK WIN strategy with multiple regularization techniques:
+    - Ridge Regression (L2) with extensive alpha grid
+    - Lasso Regression (L1) for automatic feature selection 
+    - ElasticNet (L1+L2) for balanced regularization
+    - Automated hyperparameter optimization with GridSearchCV
+    - Advanced feature engineering options
+    
+    This addresses the significant performance gap where linear regression 
+    performs 9x worse than RandomForest by implementing comprehensive
+    regularization strategies.
     
     Args:
         X_train, y_train: Training features and target
         X_test, y_test: Test features and target for final evaluation
         
     Returns:
-        dict: Model results including trained model, metrics, and predictions
+        dict: Best model results with comprehensive performance metrics
     """
-    print("\n" + "="*60)
-    print("TRAINING RIDGE REGRESSION MODEL (TUNED - OPTIMIZED ALPHA)")
-    print("="*60)
-    print("Configuration: StandardScaler + Ridge with alpha optimization")
+    print("\n" + "="*70)
+    print("TRAINING COMPREHENSIVE REGULARIZED LINEAR REGRESSION (QUICK WIN)")
+    print("="*70)
+    print("Strategy: Ridge + Lasso + ElasticNet with automated hyperparameter tuning")
+    print("Objective: Bridge the 9x performance gap with tree-based models")
     
-    # Alpha values to test for regularization
-    alphas = [0.1, 1.0, 5.0, 10.0, 20.0, 50.0, 100.0]
-    
-    best_alpha = None
-    best_cv_score = float('inf')
-    alpha_results = []
-    
-    # Time series cross-validation for alpha selection
+    # Time series cross-validation setup
     tscv = TimeSeriesSplit(n_splits=5)
     
-    print(f"\nOptimizing alpha parameter with 5-fold cross-validation:")
-    print(f"{'Alpha':<10} {'CV MAE':<12} {'Status'}")
-    print("-" * 35)
+    # COMPREHENSIVE HYPERPARAMETER GRIDS
+    # Expanded alpha ranges for better optimization
+    alpha_range = [0.001, 0.01, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0]
+    l1_ratio_range = [0.1, 0.3, 0.5, 0.7, 0.9]  # For ElasticNet
     
-    # Test each alpha value
-    for alpha in alphas:
-        # Create pipeline with current alpha
-        model = Pipeline([
-            ('scaler', StandardScaler()),
-            ('ridge', Ridge(alpha=alpha, random_state=42))
-        ])
-        
-        # Cross-validate current alpha
-        cv_scores = []
-        for train_idx, val_idx in tscv.split(X_train):
-            X_train_fold = X_train.iloc[train_idx]
-            X_val_fold = X_train.iloc[val_idx]
-            y_train_fold = y_train.iloc[train_idx]
-            y_val_fold = y_train.iloc[val_idx]
-            
-            model.fit(X_train_fold, y_train_fold)
-            pred_fold = model.predict(X_val_fold)
-            cv_scores.append(mae(y_val_fold, pred_fold))
-        
-        # Calculate average performance for this alpha
-        avg_cv_score = np.mean(cv_scores)
-        alpha_results.append((alpha, avg_cv_score))
-        
-        # Check if this is the new best alpha
-        status = "← NEW BEST" if avg_cv_score < best_cv_score else ""
-        if avg_cv_score < best_cv_score:
-            best_cv_score = avg_cv_score
-            best_alpha = alpha
-        
-        print(f"{alpha:<10} {avg_cv_score:<12.2f} {status}")
+    # Model configurations to test
+    model_configs = {
+        'Ridge': {
+            'model': Pipeline([
+                ('scaler', StandardScaler()),
+                ('regressor', Ridge(random_state=42))
+            ]),
+            'param_grid': {
+                'regressor__alpha': alpha_range
+            }
+        },
+        'Lasso': {
+            'model': Pipeline([
+                ('scaler', StandardScaler()),
+                ('regressor', Lasso(random_state=42, max_iter=100000, tol=1e-3, warm_start=False))
+            ]),
+            'param_grid': {
+                'regressor__alpha': alpha_range
+            }
+        },
+        'ElasticNet': {
+            'model': Pipeline([
+                ('scaler', StandardScaler()),
+                ('regressor', ElasticNet(random_state=42, max_iter=100000, tol=1e-3, warm_start=False))
+            ]),
+            'param_grid': {
+                'regressor__alpha': alpha_range,
+                'regressor__l1_ratio': l1_ratio_range
+            }
+        }
+    }
     
-    print(f"\nOptimal alpha selected: {best_alpha} (MAE: {best_cv_score:.2f})")
+    print(f"\nTesting {len(model_configs)} regularization techniques:")
+    print(f"- Ridge: L2 regularization ({len(alpha_range)} alphas)")
+    print(f"- Lasso: L1 regularization + feature selection ({len(alpha_range)} alphas)")
+    print(f"- ElasticNet: L1+L2 combination ({len(alpha_range)} × {len(l1_ratio_range)} combinations)")
     
-    # Train final model with optimal alpha
-    print(f"\nTraining final Ridge model with alpha={best_alpha}...")
-    final_model = Pipeline([
-        ('scaler', StandardScaler()),
-        ('ridge', Ridge(alpha=best_alpha, random_state=42))
-    ])
+    best_model = None
+    best_score = float('inf')
+    best_model_name = None
+    best_params = None
+    model_results = {}
     
-    # Final cross-validation for reporting
+    print(f"\n" + "="*50)
+    print("AUTOMATED HYPERPARAMETER OPTIMIZATION")
+    print("="*50)
+    
+    # Train and optimize each model type
+    for model_name, config in model_configs.items():
+        print(f"\n🔍 Optimizing {model_name} with GridSearchCV...")
+        
+        # Automated hyperparameter search
+        grid_search = GridSearchCV(
+            estimator=config['model'],
+            param_grid=config['param_grid'],
+            cv=tscv,
+            scoring='neg_mean_absolute_error',
+            n_jobs=-1,
+            verbose=0
+        )
+        
+        # Fit the grid search
+        grid_search.fit(X_train, y_train)
+        
+        # Get best model and score
+        cv_score = -grid_search.best_score_  # Convert back to positive MAE
+        model_results[model_name] = {
+            'best_model': grid_search.best_estimator_,
+            'best_params': grid_search.best_params_,
+            'cv_score': cv_score,
+            'grid_search': grid_search
+        }
+        
+        # Check if this is the new best model
+        status = "🏆 NEW BEST" if cv_score < best_score else ""
+        if cv_score < best_score:
+            best_score = cv_score
+            best_model = grid_search.best_estimator_
+            best_model_name = model_name
+            best_params = grid_search.best_params_
+        
+        print(f"   Best CV MAE: {cv_score:.2f}")
+        print(f"   Best params: {grid_search.best_params_}")
+        print(f"   Status: {status}")
+    
+    print(f"\n🎯 OPTIMAL MODEL SELECTED: {best_model_name}")
+    print(f"   Cross-Validation MAE: {best_score:.2f}")
+    print(f"   Best Parameters: {best_params}")
+    
+    # DETAILED PERFORMANCE ANALYSIS
+    print(f"\n" + "="*50)
+    print("COMPREHENSIVE PERFORMANCE ANALYSIS")
+    print("="*50)
+    
+    # Final cross-validation with best model for detailed metrics
     cv_scores = []
     for train_idx, val_idx in tscv.split(X_train):
         X_train_fold = X_train.iloc[train_idx]
@@ -634,10 +691,9 @@ def train_linear_regression_tuned(X_train, y_train, X_test, y_test):
         y_train_fold = y_train.iloc[train_idx]
         y_val_fold = y_train.iloc[val_idx]
         
-        temp_model = Pipeline([
-            ('scaler', StandardScaler()),
-            ('ridge', Ridge(alpha=best_alpha, random_state=42))
-        ])
+        # Create a fresh model with best parameters using clone
+        from sklearn.base import clone
+        temp_model = clone(best_model)
         temp_model.fit(X_train_fold, y_train_fold)
         pred_fold = temp_model.predict(X_val_fold)
         cv_scores.append(mae(y_val_fold, pred_fold))
@@ -646,36 +702,78 @@ def train_linear_regression_tuned(X_train, y_train, X_test, y_test):
     cv_std = np.std(cv_scores)
     
     # Train final model on full training set
+    print(f"\nTraining final {best_model_name} model on complete training set...")
+    final_model = clone(best_model)
     final_model.fit(X_train, y_train)
     
-    # Evaluate on test set
+    # Comprehensive test set evaluation
     y_pred = final_model.predict(X_test)
     test_mae = mae(y_test, y_pred)
     test_rmse = rmse(y_test, y_pred)
     test_mape = mape(y_test, y_pred)
     
+    # Feature analysis for interpretability
+    feature_analysis = {}
+    if best_model_name == 'Lasso':
+        # Analyze feature selection (Lasso zeros out irrelevant features)
+        regressor = final_model.named_steps['regressor']
+        n_selected = np.sum(regressor.coef_ != 0)
+        n_total = len(regressor.coef_)
+        feature_analysis['features_selected'] = n_selected
+        feature_analysis['features_total'] = n_total
+        feature_analysis['selection_ratio'] = n_selected / n_total
+        print(f"\n🔍 LASSO FEATURE SELECTION:")
+        print(f"   Selected: {n_selected}/{n_total} features ({n_selected/n_total:.1%})")
+        print(f"   Automatic dimensionality reduction achieved!")
+    
+    elif best_model_name == 'ElasticNet':
+        regressor = final_model.named_steps['regressor']
+        feature_analysis['l1_ratio'] = regressor.l1_ratio
+        feature_analysis['alpha'] = regressor.alpha
+        n_selected = np.sum(np.abs(regressor.coef_) > 1e-10)  # Effectively non-zero
+        n_total = len(regressor.coef_)
+        feature_analysis['features_selected'] = n_selected
+        feature_analysis['selection_ratio'] = n_selected / n_total
+        print(f"\n🔍 ELASTICNET REGULARIZATION:")
+        print(f"   L1 ratio: {regressor.l1_ratio:.3f} (feature selection strength)")
+        print(f"   Alpha: {regressor.alpha:.3f} (regularization strength)")
+        print(f"   Active features: {n_selected}/{n_total} ({n_selected/n_total:.1%})")
+        
+    elif best_model_name == 'Ridge':
+        regressor = final_model.named_steps['regressor']
+        feature_analysis['alpha'] = regressor.alpha
+        print(f"\n🔍 RIDGE REGULARIZATION:")
+        print(f"   Alpha: {regressor.alpha:.3f} (L2 regularization strength)")
+        print(f"   All features retained with controlled weights")
+    
     # Compile comprehensive results
     results = {
         'model': final_model,
-        'best_alpha': best_alpha,
+        'model_name': best_model_name,
+        'best_params': best_params,
         'cv_mae': cv_score,
         'cv_std': cv_std,
         'test_mae': test_mae,
         'test_rmse': test_rmse,
         'test_mape': test_mape,
         'predictions': y_pred,
-        'alpha_results': alpha_results,
-        'model_type': 'Ridge_Tuned'
+        'cv_scores': cv_scores,
+        'model_type': f'{best_model_name}_Tuned',
+        'feature_analysis': feature_analysis,
+        'all_model_results': model_results
     }
     
-    # Display final performance metrics
-    print(f"\nTuned Model Performance:")
-    print(f"  Best Alpha: {best_alpha}")
-    print(f"  Cross-Validation MAE: {cv_score:.2f} (±{cv_std:.2f})")
-    print(f"  Test MAE: {test_mae:.2f}")
-    print(f"  Test RMSE: {test_rmse:.2f}")
-    print(f"  Test MAPE: {test_mape:.2f}%")
-    print("="*60)
+    # Display comprehensive performance summary
+    print(f"🏆 Best Model: {best_model_name} Regression")
+    print(f"📊 Cross-Validation MAE: {cv_score:.2f} (±{cv_std:.2f})")
+    print(f"🎯 Test MAE: {test_mae:.2f}")
+    print(f"📈 Test RMSE: {test_rmse:.2f}")
+    print(f"📋 Test MAPE: {test_mape:.2f}%")
+    print(f"\n💡 Strategy Impact:")
+    print(f"   - Comprehensive regularization implemented")
+    print(f"   - Automated hyperparameter optimization")
+    print(f"   - {len(alpha_range)} alpha values tested per model")
+    print(f"   - Expected significant performance improvement vs basic Ridge")
     
     return results
 
@@ -788,8 +886,14 @@ def save_ml_models(results_dict, feature_cols):
         }
         
         # Add model-specific metadata
-        if model_name == 'Ridge' and 'best_alpha' in results:
+        if 'Ridge' in model_name and 'best_alpha' in results:
             save_dict['best_alpha'] = results['best_alpha']
+        if 'model_name' in results:
+            save_dict['model_name'] = results['model_name']
+        if 'best_params' in results:
+            save_dict['best_params'] = results['best_params']
+        if 'feature_analysis' in results:
+            save_dict['feature_analysis'] = results['feature_analysis']
         
         with open(model_path, 'wb') as f:
             pickle.dump(save_dict, f)

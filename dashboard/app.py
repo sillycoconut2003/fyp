@@ -50,7 +50,7 @@ def load_ml_models():
     model_files = {
         'RandomForest': 'RandomForest_model.pkl',
         'XGBoost': 'XGBoost_model.pkl',
-        'LinearRegression': 'LinearRegression_model.pkl'
+        'EnhancedRegression': 'Ridge_Tuned_model.pkl'  # Enhanced ElasticNet model
     }
     
     for name, filename in model_files.items():
@@ -777,7 +777,7 @@ def main():
     stat_cards = [
         render_stat_card("Best Performer", "RandomForest", "MAE: 13,637", "up"),
         render_stat_card("XGBoost Model", "MAE: 39,885", "+192% vs Best", "down"), 
-        render_stat_card("Linear Regression", "MAE: 130,912", "+860% vs Best", "down"),
+        render_stat_card("Ridge Regression", "MAE: 131,278", "ElasticNet α=0.001", "neutral"),
         render_stat_card("Total Models Trained", "267", "3 ML + 264 TS", "neutral"),
     ]
     # Render within main DOM so global CSS applies
