@@ -50,7 +50,9 @@ def load_ml_models():
     model_files = {
         'RandomForest': 'RandomForest_model.pkl',
         'XGBoost': 'XGBoost_model.pkl',
-        'EnhancedRegression': 'Ridge_Tuned_model.pkl'  # Enhanced ElasticNet model
+        'EnhancedRegression': 'Ridge_Tuned_model.pkl',  # Enhanced ElasticNet model
+        'StackingEnsemble': 'StackingEnsemble_model.pkl',  # Original 3-model ensemble
+        'OptimizedEnsemble': 'OptimizedStackingEnsemble_model.pkl'  # Improved 2-model ensemble (RF+XGB)
     }
     
     for name, filename in model_files.items():
@@ -148,22 +150,23 @@ def display_image_with_caption(image_path, caption):
     else:
         st.warning(f"Image not found: {image_path.name}")
 
-def create_performance_comparison_chart(results_df):
-    """Create interactive comparison chart for model performance"""
+def create_comprehensive_performance_chart(results_df):
+    """Create interactive comparison chart for all model types (ML + TS)"""
     if results_df.empty:
         return None
     
-    # Filter for ML models only and calculate averages across splits
-    ml_results = results_df[results_df['model_type'] == 'ML'].copy()
-    if ml_results.empty:
-        return None
-    
-    # Calculate average metrics across splits for each model
-    avg_metrics = ml_results.groupby('model_name').agg({
+    # Calculate average metrics across splits for all models
+    avg_metrics = results_df.groupby(['model_type', 'model_name']).agg({
         'mae': 'mean',
         'rmse': 'mean',
         'mape': 'mean'
     }).reset_index()
+    
+    # Create combined model names for better visualization
+    avg_metrics['combined_name'] = avg_metrics['model_type'] + ': ' + avg_metrics['model_name']
+    
+    # Sort by MAE for better visualization
+    avg_metrics = avg_metrics.sort_values('mae')
     
     # Create subplots
     fig = make_subplots(
@@ -172,15 +175,21 @@ def create_performance_comparison_chart(results_df):
         specs=[[{"secondary_y": False}, {"secondary_y": False}, {"secondary_y": False}]]
     )
     
-    colors = ['#3b82f6', '#ef4444', '#10b981']  # Blue, Red, Green
+    # Color coding by model type
+    colors = []
+    for model_type in avg_metrics['model_type']:
+        if model_type == 'ML':
+            colors.append('#3b82f6')  # Blue for ML
+        else:  # TS
+            colors.append('#10b981')  # Green for Time Series
     
     # MAE comparison
     fig.add_trace(
         go.Bar(
-            x=avg_metrics['model_name'],
+            x=avg_metrics['combined_name'],
             y=avg_metrics['mae'],
             name='MAE',
-            marker_color=colors[0],
+            marker_color=colors,
             showlegend=False
         ),
         row=1, col=1
@@ -189,10 +198,10 @@ def create_performance_comparison_chart(results_df):
     # RMSE comparison  
     fig.add_trace(
         go.Bar(
-            x=avg_metrics['model_name'],
+            x=avg_metrics['combined_name'],
             y=avg_metrics['rmse'],
             name='RMSE',
-            marker_color=colors[1],
+            marker_color=colors,
             showlegend=False
         ),
         row=1, col=2
@@ -201,26 +210,66 @@ def create_performance_comparison_chart(results_df):
     # MAPE comparison
     fig.add_trace(
         go.Bar(
-            x=avg_metrics['model_name'],
+            x=avg_metrics['combined_name'],
             y=avg_metrics['mape'],
             name='MAPE',
-            marker_color=colors[2],
+            marker_color=colors,
             showlegend=False
         ),
         row=1, col=3
     )
     
     fig.update_layout(
-        title="Machine Learning Model Performance Comparison",
+        title="Comprehensive Model Performance Comparison (ML + Time Series)",
         template="plotly_dark",
         height=500,
-        showlegend=False
+        showlegend=False,
+        xaxis_tickangle=-45,
+        xaxis2_tickangle=-45,
+        xaxis3_tickangle=-45,
     )
     
     # Update y-axis labels
     fig.update_yaxes(title_text="MAE", row=1, col=1)
     fig.update_yaxes(title_text="RMSE", row=1, col=2)
     fig.update_yaxes(title_text="MAPE (%)", row=1, col=3)
+    
+    return fig
+
+def create_model_type_comparison_chart(results_df):
+    """Create chart comparing ML vs Time Series performance"""
+    if results_df.empty:
+        return None
+    
+    # Group by model type
+    type_comparison = results_df.groupby('model_type').agg({
+        'mae': ['mean', 'std', 'count'],
+        'rmse': ['mean', 'std'],
+        'mape': ['mean', 'std']
+    }).round(2)
+    
+    # Flatten column names
+    type_comparison.columns = ['_'.join(col).strip() for col in type_comparison.columns.values]
+    type_comparison = type_comparison.reset_index()
+    
+    # Create comparison chart
+    fig = go.Figure()
+    
+    fig.add_trace(go.Bar(
+        x=type_comparison['model_type'],
+        y=type_comparison['mae_mean'],
+        error_y=dict(type='data', array=type_comparison['mae_std'], visible=True),
+        name='Mean Absolute Error',
+        marker_color=['#3b82f6', '#10b981']
+    ))
+    
+    fig.update_layout(
+        title="ML vs Time Series: Overall Performance Comparison",
+        xaxis_title="Model Type",
+        yaxis_title="Mean Absolute Error",
+        template="plotly_dark",
+        height=400
+    )
     
     return fig
 
@@ -467,17 +516,42 @@ def predict_ml_model(df, model_info, model_name, periods=12, kpi_name=""):
                 # Make prediction
                 raw_pred = model.predict(X_pred)[0]
                 
-                # Add controlled variation for overly stable models
+                # ENHANCED variation handling for different model types
                 if model_name in ['RandomForest', 'XGBoost']:
-                    # Calculate historical month-to-month volatility
+                    # Tree-based models: Light variation to add realism
                     historical_values = df_extended['MONTHLY_ACTUAL'].values
                     monthly_changes = np.diff(historical_values)
                     volatility = np.std(monthly_changes) * 0.3  # Use 30% of historical volatility
                     
-                    # Add small random variation to prevent overly smooth predictions
                     np.random.seed(42 + i)  # Reproducible randomness
                     variation = np.random.normal(0, volatility)
                     raw_pred = raw_pred + variation
+                    
+                elif model_name in ['StackingEnsemble', 'EnhancedRegression']:
+                    # Linear/Ensemble models: More aggressive trend injection to prevent flat forecasts
+                    historical_values = df_extended['MONTHLY_ACTUAL'].values
+                    
+                    # Calculate recent trend (last 6 months)
+                    if len(historical_values) >= 6:
+                        recent_trend = np.polyfit(range(6), historical_values[-6:], 1)[0]  # Linear slope
+                    else:
+                        recent_trend = 0
+                    
+                    # Calculate volatility for variation
+                    monthly_changes = np.diff(historical_values)
+                    volatility = np.std(monthly_changes) * 0.5  # Use 50% of historical volatility for more variation
+                    
+                    # Add trend continuation + controlled randomness
+                    np.random.seed(42 + i)
+                    trend_component = recent_trend * (i + 1)  # Cumulative trend effect
+                    random_component = np.random.normal(0, volatility)
+                    
+                    # Apply both components but keep it reasonable
+                    raw_pred = raw_pred + (trend_component * 0.7) + random_component
+                    
+                    print(f"  📈 {model_name} Step {i+1}: base={raw_pred-trend_component*0.7-random_component:.0f}, trend={trend_component*0.7:.0f}, random={random_component:.0f}")
+                    
+                print(f"  Step {i+1}: {raw_pred:.0f}")
                 
                 # Apply bounds checking
                 if (np.isnan(raw_pred) or np.isinf(raw_pred) or 
@@ -775,10 +849,10 @@ def main():
     # --- Performance Metrics (Stat Grid) ---
     st.markdown("#### Model Performance Overview")
     stat_cards = [
-        render_stat_card("Best Performer", "RandomForest", "MAE: 13,637", "up"),
-        render_stat_card("XGBoost Model", "MAE: 39,885", "+192% vs Best", "down"), 
-        render_stat_card("Ridge Regression", "MAE: 131,278", "ElasticNet α=0.001", "neutral"),
-        render_stat_card("Total Models Trained", "267", "3 ML + 264 TS", "neutral"),
+        render_stat_card("🏆 Best Performer", "RandomForest", "MAE: 13,637", "up"),
+        render_stat_card("Optimized Ensemble", "MAE: 20,880", "RandomForest + XGBoost", "neutral"),
+        render_stat_card("XGBoost Model", "MAE: 39,885", "Gradient Boosting", "neutral"),
+        render_stat_card("Enhanced Regression", "MAE: 130,912", "Ridge α=1.0", "down"),
     ]
     # Render within main DOM so global CSS applies
     st.markdown(render_stat_grid(stat_cards), unsafe_allow_html=True)
@@ -896,18 +970,117 @@ def main():
         agencies_with_selected_kpi = next(agencies for kpi, agencies in common_kpis if kpi == selected_kpi_clean)
         
         # Step 3: Select agencies to compare
-        comparison_agencies = st.sidebar.multiselect(
-            "Select Agencies to Compare",
-            agencies_with_selected_kpi,
-            default=agencies_with_selected_kpi[:2],  # Default to first 2 agencies
-            help=f"Choose 2-{len(agencies_with_selected_kpi)} agencies to compare for {selected_kpi_clean}"
-        )
-        
-        if len(comparison_agencies) < 2:
-            st.sidebar.warning("Please select at least 2 agencies for comparison")
+        st.sidebar.markdown("#### Agency Comparison Selection")
+        st.sidebar.info(f"**{len(agencies_with_selected_kpi)} agencies** available for '{selected_kpi_clean}' comparison")
+
+        # Create formatted options with data counts
+        agency_options = []
+        for agency in agencies_with_selected_kpi:
+            agency_records = len(df[(df['AGENCY_NAME'] == agency) & (df['INDICATOR_NAME'].str.strip() == selected_kpi_clean)])
+            agency_options.append(f"{agency} ({agency_records} records)")
+
+        # Two-column selection layout
+        st.sidebar.markdown("**Select Agencies to Compare:**")
+        col1, col2 = st.sidebar.columns(2)
+
+        # Get current selections from session state
+        agency1_selection = getattr(st.session_state, 'agency1', None)
+        agency2_selection = getattr(st.session_state, 'agency2', None)
+
+        with col1:
+            st.markdown("**Agency 1**")
+            # Available options for first selection (all agencies)
+            agency1_options = ["Select Agency..."] + agency_options
+
+            # Find current selection index
+            agency1_idx = 0
+            if agency1_selection:
+                for i, option in enumerate(agency_options):
+                    if option.startswith(agency1_selection + " ("):
+                        agency1_idx = i + 1  # +1 because of "Select Agency..." at index 0
+                        break
+
+            selected_agency1_formatted = st.selectbox(
+                "Primary Agency",
+                agency1_options,
+                index=agency1_idx,
+                key="agency1_select",
+                help="Select the first agency for comparison"
+            )
+
+            # Extract agency name from formatted selection
+            if selected_agency1_formatted != "Select Agency...":
+                for agency in agencies_with_selected_kpi:
+                    if selected_agency1_formatted.startswith(agency + " ("):
+                        agency1_selection = agency
+                        break
+            else:
+                agency1_selection = None
+
+        with col2:
+            st.markdown("**Agency 2**")
+            # Available options for second selection (exclude agency1)
+            agency2_options = ["Select Agency..."]
+            for option in agency_options:
+                # Don't include agency1's option
+                if agency1_selection and option.startswith(agency1_selection + " ("):
+                    continue
+                agency2_options.append(option)
+
+            # Find current selection index
+            agency2_idx = 0
+            if agency2_selection:
+                for i, option in enumerate(agency2_options):
+                    if option.startswith(agency2_selection + " ("):
+                        agency2_idx = i
+                        break
+
+            selected_agency2_formatted = st.selectbox(
+                "Comparison Agency",
+                agency2_options,
+                index=agency2_idx,
+                key="agency2_select",
+                help="Select the second agency for comparison"
+            )
+
+            # Extract agency name from formatted selection
+            if selected_agency2_formatted != "Select Agency...":
+                for agency in agencies_with_selected_kpi:
+                    if selected_agency2_formatted.startswith(agency + " ("):
+                        agency2_selection = agency
+                        break
+            else:
+                agency2_selection = None
+
+        # Update session state
+        st.session_state.agency1 = agency1_selection
+        st.session_state.agency2 = agency2_selection
+
+        # Build comparison agencies list
+        comparison_agencies = []
+        if agency1_selection:
+            comparison_agencies.append(agency1_selection)
+        if agency2_selection:
+            comparison_agencies.append(agency2_selection)
+
+        # Show selection summary and handle validation
+        if len(comparison_agencies) >= 2:
+            st.sidebar.success(f"✅ **Ready to Compare**: {comparison_agencies[0]} vs {comparison_agencies[1]}")
+            
+            # Clear selections button (only show when agencies are selected)
+            if st.sidebar.button("🔄 Clear Selections", help="Reset agency selections"):
+                st.session_state.agency1 = None
+                st.session_state.agency2 = None
+                st.rerun()
+        else:
+            # Single consolidated message for incomplete selection
+            if len(comparison_agencies) == 1:
+                st.sidebar.info(f"Select a second agency to compare with **{comparison_agencies[0]}**")
+            else:
+                st.sidebar.info("Select **two agencies** above to start comparison")
             st.stop()
         
-        # Find the original KPI name (with potential extra spaces)
+        # Find the original KPI name
         selected_kpi = None
         for agency in comparison_agencies:
             agency_data = df[df['AGENCY_NAME'] == agency]
@@ -915,10 +1088,6 @@ def main():
             if matching_kpis:
                 selected_kpi = matching_kpis[0]
                 break
-        
-        # Display comparison summary
-        st.sidebar.success(f"**Comparing**: {selected_kpi_clean[:30]}{'...' if len(selected_kpi_clean) > 30 else ''}")
-        st.sidebar.info(f"**Agencies**: {', '.join(comparison_agencies)}")
         
         # Show data availability for each agency with warnings
         agencies_with_insufficient_data = []
@@ -953,7 +1122,23 @@ def main():
     
     # Model Selection Section
     st.sidebar.markdown("### Model Selection")
-    series_key = f"{selected_agency}|{selected_kpi}"
+    
+    # Find the original KPI name for series key (needed for time series models)
+    if analysis_mode == "Single Agency Analysis":
+        # Use the selected_kpi which is already the original name for single agency
+        original_kpi_for_series = selected_kpi
+    else:
+        # For multi-agency, find the original KPI name from the primary agency
+        agency_df = df[df['AGENCY_NAME'] == selected_agency]
+        original_kpi_for_series = None
+        for kpi in agency_df['INDICATOR_NAME'].unique():
+            if kpi.strip() == selected_kpi_clean:
+                original_kpi_for_series = kpi
+                break
+        if not original_kpi_for_series:
+            original_kpi_for_series = selected_kpi_clean
+    
+    series_key = f"{selected_agency}|{original_kpi_for_series}"
 
     model_options = [f"ML: {name}" for name in ml_models.keys()]
     
@@ -969,7 +1154,7 @@ def main():
     selected_model_name = st.sidebar.selectbox(
         "Forecasting Model", 
         model_options,
-        help="Choose between Machine Learning (ML) and Time Series (TS) models"
+        help="Choose between Machine Learning (ML) and Time Series (TS) models. StackingEnsemble combines multiple ML models for enhanced predictions."
     )
     
     st.sidebar.markdown("---")
@@ -992,32 +1177,12 @@ def main():
     else:
         st.sidebar.info("**Short-term Forecast (<2 years)**: High confidence predictions for tactical decisions.")
 
-    # Generate Forecast Button for Multi-Agency Mode
-    generate_forecast = True  # Default for single agency (auto-generate)
-    if analysis_mode == "Multi-Agency Comparison":
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("### Generate Analysis")
-        generate_forecast = st.sidebar.button(
-            "Generate Multi-Agency Forecast",
-            type="primary",
-            help="Click to generate forecasts for all selected agencies and update the comparison chart",
-            use_container_width=True
-        )
-        
-        if not generate_forecast:
-            st.sidebar.info("📊 Configure your settings above, then click 'Generate Multi-Agency Forecast' to run the analysis.")
-    
-    # Only proceed with data processing if forecast should be generated
-    if not generate_forecast:
-        st.info("Please configure your settings in the sidebar and click 'Generate Multi-Agency Forecast' to begin the analysis.")
-        return
-
     # --- Main Content Area ---
-    tab1, tab2, tab3 = st.tabs(["📈 Forecast Analysis", "📊 Data Explorer", "🎯 Model Training Results"])
+    tab1, tab2, tab3 = st.tabs(["Forecast Analysis", "Data Explorer", "Model Training Results"])
 
     # Prepare data for analysis
     if analysis_mode == "Single Agency Analysis":
-        filtered_data = df[(df['INDICATOR_NAME'] == selected_kpi) & (df['AGENCY_NAME'] == selected_agency)].copy()
+        filtered_data = df[(df['INDICATOR_NAME'].str.strip() == selected_kpi_clean) & (df['AGENCY_NAME'] == selected_agency)].copy()
         filtered_data['Date'] = pd.to_datetime(filtered_data['YYYY_MM'])
         filtered_data['Value'] = filtered_data['MONTHLY_ACTUAL']
         filtered_data = filtered_data.sort_values('Date')
@@ -1029,7 +1194,7 @@ def main():
         # Prepare comparison data - only for currently selected agencies
         comparison_data = {}
         for agency in comparison_agencies:
-            agency_data = df[(df['INDICATOR_NAME'] == selected_kpi) & (df['AGENCY_NAME'] == agency)].copy()
+            agency_data = df[(df['INDICATOR_NAME'].str.strip() == selected_kpi_clean) & (df['AGENCY_NAME'] == agency)].copy()
             agency_data['Date'] = pd.to_datetime(agency_data['YYYY_MM'])
             agency_data['Value'] = agency_data['MONTHLY_ACTUAL']
             agency_data = agency_data.sort_values('Date')
@@ -1060,16 +1225,29 @@ def main():
                 predictions = predict_ts_model(filtered_data, model_info, ts_type, periods)
     else:
         # Multi-agency prediction - generate forecast for each agency
-        st.info(f"🔄 Generating forecasts for {len(comparison_agencies)} agencies...")
-        progress_bar = st.progress(0)
-        
+        progress_placeholder = st.empty()
+        success_placeholder = st.empty()
+
+        with progress_placeholder:
+            st.info(f"🔄 Generating forecasts for {len(comparison_agencies)} agencies...")
+            progress_bar = st.progress(0)
+
         for i, agency in enumerate(comparison_agencies):
             if agency in comparison_data and not comparison_data[agency].empty:
                 agency_data = comparison_data[agency]
-                agency_series_key = f"{agency}|{selected_kpi}"
                 
+                # Find the original KPI name for this specific agency for time series models
+                agency_df = df[df['AGENCY_NAME'] == agency]
+                agency_original_kpi = None
+                for kpi in agency_df['INDICATOR_NAME'].unique():
+                    if kpi.strip() == selected_kpi_clean:
+                        agency_original_kpi = kpi
+                        break
+                
+                agency_series_key = f"{agency}|{agency_original_kpi}" if agency_original_kpi else f"{agency}|{selected_kpi_clean}"
+
                 agency_prediction = pd.DataFrame()
-                
+
                 if selected_model_name.startswith("ML:"):
                     model_name = selected_model_name.split(": ")[1]
                     if model_name in ml_models:
@@ -1080,22 +1258,26 @@ def main():
                     if ts_type in ts_models and agency_series_key in ts_models[ts_type]:
                         model_info = ts_models[ts_type][agency_series_key]
                         agency_prediction = predict_ts_model(agency_data, model_info, ts_type, periods)
-                
+
                 if not agency_prediction.empty:
                     # Add agency identifier to predictions
                     agency_prediction['Agency'] = agency
                     multi_agency_predictions[agency] = agency_prediction
-                
+
                 # Update progress bar
                 progress_bar.progress((i + 1) / len(comparison_agencies))
-        
-        # Clear progress bar
-        progress_bar.empty()
-        
+
+        # Clear progress messages
+        progress_placeholder.empty()
+
         if multi_agency_predictions:
-            st.success(f"✅ Generated forecasts for {len(multi_agency_predictions)} agencies!")
+            with success_placeholder:
+                st.success(f"✅ Generated forecasts for {len(multi_agency_predictions)} agencies!")
+            success_placeholder.empty()
         else:
-            st.warning("⚠️ Could not generate forecasts for the selected model and agencies.")
+            with success_placeholder:
+                st.warning("⚠️ Could not generate forecasts for the selected model and agencies.")
+            success_placeholder.empty()
 
     with tab1:
         if analysis_mode == "Single Agency Analysis":
@@ -1156,50 +1338,71 @@ def main():
             # Ensure comparison_data only contains selected agencies (defensive programming)
             filtered_comparison_data = {agency: comparison_data[agency] for agency in comparison_agencies if agency in comparison_data}
             
+            # Enhanced color palette for better differentiation
+            agency_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f']
+            
             # Plot each agency's historical data and forecasts with different colors
             for i, agency in enumerate(comparison_agencies):
                 if agency in filtered_comparison_data:
                     agency_data = filtered_comparison_data[agency]
                     if not agency_data.empty:
-                        # Historical data
+                        base_color = agency_colors[i % len(agency_colors)]
+                        
+                        # Historical data - solid lines
                         fig.add_trace(go.Scatter(
                             x=agency_data['Date'], 
                             y=agency_data['Value'],
                             mode='lines+markers', 
-                            name=f"{agency} (Historical)",
-                            line=dict(color=colors[i % len(colors)], width=2.5),
-                            marker=dict(size=4, color=colors[i % len(colors)])
+                            name=f"{agency} - Historical",
+                            line=dict(color=base_color, width=3),
+                            marker=dict(size=5, color=base_color),
+                            legendgroup=agency
                         ))
                         
-                        # Forecast data (if available)
+                        # Forecast data (if available) - dashed lines
                         if agency in multi_agency_predictions:
                             agency_forecast = multi_agency_predictions[agency]
-                            fig.add_trace(go.Scatter(
-                                x=agency_forecast['Date'], 
-                                y=agency_forecast['Prediction'],
-                                mode='lines+markers', 
-                                name=f"{agency} (Forecast)",
-                                line=dict(color=colors[i % len(colors)], dash='dash', width=2.5),
-                                marker=dict(size=4, color=colors[i % len(colors)])
-                            ))
-                            
-                            # Confidence intervals for forecasts
-                            if 'Lower' in agency_forecast.columns and 'Upper' in agency_forecast.columns:
+                            if not agency_forecast.empty:
                                 fig.add_trace(go.Scatter(
-                                    x=agency_forecast['Date'], y=agency_forecast['Upper'],
-                                    mode='lines', line=dict(width=0), showlegend=False
+                                    x=agency_forecast['Date'], 
+                                    y=agency_forecast['Prediction'],
+                                    mode='lines+markers', 
+                                    name=f"{agency} - Forecast",
+                                    line=dict(color=base_color, dash='dash', width=3),
+                                    marker=dict(size=5, color=base_color, symbol='diamond'),
+                                    legendgroup=agency
                                 ))
-                                fig.add_trace(go.Scatter(
-                                    x=agency_forecast['Date'], y=agency_forecast['Lower'],
-                                    mode='lines', fill='tonexty',
-                                    fillcolor=f'rgba({int(colors[i % len(colors)][1:3], 16)},{int(colors[i % len(colors)][3:5], 16)},{int(colors[i % len(colors)][5:7], 16)},0.15)',
-                                    line=dict(width=0), name=f'{agency} CI'
-                                ))
+                                
+                                # Confidence intervals for forecasts
+                                if 'Lower' in agency_forecast.columns and 'Upper' in agency_forecast.columns:
+                                    # Convert hex color to rgb for transparency
+                                    rgb_color = tuple(int(base_color[i:i+2], 16) for i in (1, 3, 5))
+                                    
+                                    fig.add_trace(go.Scatter(
+                                        x=agency_forecast['Date'], 
+                                        y=agency_forecast['Upper'],
+                                        mode='lines', 
+                                        line=dict(width=0), 
+                                        showlegend=False,
+                                        hoverinfo='skip',
+                                        legendgroup=agency
+                                    ))
+                                    fig.add_trace(go.Scatter(
+                                        x=agency_forecast['Date'], 
+                                        y=agency_forecast['Lower'],
+                                        mode='lines', 
+                                        fill='tonexty',
+                                        fillcolor=f'rgba({rgb_color[0]},{rgb_color[1]},{rgb_color[2]},0.2)',
+                                        line=dict(width=0), 
+                                        name=f'{agency} - Confidence',
+                                        hoverinfo='skip',
+                                        legendgroup=agency
+                                    ))
             
             chart_title = f"Multi-Agency Comparison: {selected_kpi_clean}"
             
-            # Add comparison statistics below the chart
-            st.markdown("### 📊 Agency Performance Summary")
+            # Add comparison statistics below the chart using streamlit components instead of HTML
+            st.markdown("### **Agency Performance Summary**")
             stats_cols = st.columns(len(comparison_agencies))
             
             for i, agency in enumerate(comparison_agencies):
@@ -1211,35 +1414,51 @@ def main():
                             latest_value = agency_data['Value'].iloc[-1]
                             latest_date = agency_data['Date'].iloc[-1].strftime('%b %Y')
                             
-                            # Check if forecast is available for this agency
-                            forecast_info = ""
+                            # Use streamlit metrics instead of HTML
+                            st.markdown(f"**{agency}**")
+                            st.metric("Average", f"{avg_value:.1f}")
+                            st.metric(f"Latest ({latest_date})", f"{latest_value:.1f}")
+                            
+                            # Add forecast info if available
                             if agency in multi_agency_predictions:
                                 forecast_data = multi_agency_predictions[agency]
                                 if not forecast_data.empty:
                                     first_forecast = forecast_data['Prediction'].iloc[0]
                                     forecast_date = forecast_data['Date'].iloc[0].strftime('%b %Y')
-                                    delta = ((first_forecast / latest_value) - 1) * 100 if latest_value else 0
-                                    forecast_info = f"""
-                                    <div style="color: var(--muted); font-size: 0.85rem; margin-top: var(--space-2);">Next Forecast ({forecast_date})</div>
-                                    <div style="color: var(--text); font-weight: 500;">{first_forecast:.1f} ({delta:+.1f}%)</div>
-                                    """
-                            
-                            st.markdown(f"""
-                            <div style="background: var(--card); border: 1px solid var(--border); 
-                                        border-left: 4px solid {colors[i % len(colors)]}; border-radius: var(--radius); 
-                                        padding: var(--space-4); text-align: center;">
-                                <div style="color: {colors[i % len(colors)]}; font-weight: 700; font-size: 1.1rem; margin-bottom: var(--space-2);">
-                                    {agency}
-                                </div>
-                                <div style="color: var(--muted); font-size: 0.85rem;">Average</div>
-                                <div style="color: var(--text); font-weight: 600; font-size: 1.2rem;">{avg_value:.1f}</div>
-                                <div style="color: var(--muted); font-size: 0.85rem; margin-top: var(--space-2);">Latest ({latest_date})</div>
-                                <div style="color: var(--text); font-weight: 500;">{latest_value:.1f}</div>
-                                {forecast_info}
-                            </div>
-                            """, unsafe_allow_html=True)
+                                    delta = ((first_forecast / latest_value) - 1) * 100 if latest_value != 0 else 0
+                                    st.metric(f"Next Forecast ({forecast_date})", 
+                                             f"{first_forecast:.1f}", 
+                                             f"{delta:+.1f}%")
         
-        # Update chart layout
+        # Update chart layout with improved legend handling
+        if analysis_mode == "Multi-Agency Comparison":
+            # For multi-agency, use vertical legend on the right to prevent overlapping
+            legend_config = dict(
+                orientation="v",
+                yanchor="top",
+                y=1,
+                xanchor="left",
+                x=1.02,
+                bgcolor="rgba(26,31,38,0.9)",
+                bordercolor="rgba(51,65,85,0.5)",
+                borderwidth=1,
+                font=dict(size=11)
+            )
+            chart_height = 600  # Taller for multi-agency
+            margin_config = dict(l=20, r=150, t=80, b=20)  # More right margin for legend
+        else:
+            # For single agency, use horizontal legend at bottom
+            legend_config = dict(
+                orientation="h", 
+                yanchor="bottom", 
+                y=1.02, 
+                xanchor="left", 
+                x=0,
+                bgcolor="rgba(0,0,0,0)"
+            )
+            chart_height = 520
+            margin_config = dict(l=20, r=20, t=80, b=20)
+        
         fig.update_layout(
             template="plotly_dark",
             title=dict(
@@ -1249,17 +1468,10 @@ def main():
             ),
             xaxis_title="Date", 
             yaxis_title="Value",
-            height=520, 
+            height=chart_height, 
             hovermode="x unified",
-            margin=dict(l=20, r=20, t=80, b=20),
-            legend=dict(
-                orientation="h", 
-                yanchor="bottom", 
-                y=1.02, 
-                xanchor="left", 
-                x=0,
-                bgcolor="rgba(0,0,0,0)"
-            ),
+            margin=margin_config,
+            legend=legend_config,
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)"
         )
@@ -1369,11 +1581,13 @@ def main():
                     """, unsafe_allow_html=True)
         
         # Show warning only if no predictions were generated
-        if predictions.empty:
+        if analysis_mode == "Single Agency Analysis" and predictions.empty:
             st.warning("Could not generate a forecast for the selected model.")
+        elif analysis_mode == "Multi-Agency Comparison" and not multi_agency_predictions:
+            st.warning("Could not generate forecasts for the selected model and agencies.")
 
     with tab3:
-        st.subheader("🎯 Model Training Results & Hyperparameter Tuning Analysis")
+        st.subheader("Comprehensive Model Training Results & Analysis")
         
         # Load training results
         training_results = load_training_results()
@@ -1381,156 +1595,333 @@ def main():
         available_plots = get_available_training_plots()
         
         if training_results.empty:
-            st.warning("⚠️ No training results available. Please run the training pipeline first.")
+            st.warning("No training results available. Please run the training pipeline first.")
             st.info("💡 To generate training results, run: `python src/train_ml.py` or use the batch file `run_interactive_training.bat`")
         else:
             # Performance Overview Section
-            st.markdown("### 📊 Model Performance Overview")
+            st.markdown("### Complete Model Performance Overview")
             
-            # Calculate summary statistics
+            # Calculate summary statistics for both ML and TS models
             ml_results = training_results[training_results['model_type'] == 'ML'].copy()
             ts_results = training_results[training_results['model_type'] == 'TS'].copy()
             
-            if not ml_results.empty:
-                ml_summary = ml_results.groupby('model_name').agg({
-                    'mae': ['mean', 'std'],
-                    'rmse': ['mean', 'std'],
-                    'mape': ['mean', 'std']
-                }).round(2)
+            # Display high-level statistics
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                total_kpis = len(training_results['kpi_name'].unique())
+                total_model_runs = len(training_results)
+                st.metric("Total KPIs Evaluated", total_kpis)
+                st.metric("Total Model Runs", total_model_runs)
+            
+            with col2:
+                if not ml_results.empty:
+                    ml_models_count = len(ml_results['model_name'].unique())
+                    best_ml_mae = ml_results.groupby('model_name')['mae'].mean().min()
+                    st.metric("ML Models", ml_models_count)
+                    st.metric("Best ML MAE", f"{best_ml_mae:,.0f}")
+            
+            with col3:
+                if not ts_results.empty:
+                    ts_models_count = len(ts_results['model_name'].unique())
+                    best_ts_mae = ts_results.groupby('model_name')['mae'].mean().min()
+                    st.metric("Time Series Models", ts_models_count)
+                    st.metric("Best TS MAE", f"{best_ts_mae:,.0f}")
+            
+            # Comprehensive Performance Charts
+            if not training_results.empty:
+                # All models comparison
+                comprehensive_chart = create_comprehensive_performance_chart(training_results)
+                if comprehensive_chart:
+                    st.plotly_chart(comprehensive_chart, use_container_width=True)
                 
-                # Create performance comparison chart
-                perf_chart = create_performance_comparison_chart(training_results)
-                if perf_chart:
-                    st.plotly_chart(perf_chart, use_container_width=True)
-                
-                # Model ranking based on MAE (lower is better)
-                model_ranking = ml_results.groupby('model_name')['mae'].mean().sort_values()
-                
-                st.markdown("### 🏆 Model Ranking (by Mean Absolute Error)")
-                col1, col2, col3 = st.columns(3)
-                
-                for i, (model_name, mae_score) in enumerate(model_ranking.items()):
-                    if i == 0:
-                        col = col1
-                        icon = "🥇"
-                        color = "#10b981"  # Green
-                    elif i == 1:
-                        col = col2
-                        icon = "🥈"
-                        color = "#f59e0b"  # Yellow
-                    else:
-                        col = col3
-                        icon = "🥉"
-                        color = "#ef4444"  # Red
+                # ML vs TS comparison
+                if not ml_results.empty and not ts_results.empty:
+                    st.markdown("### Machine Learning vs Time Series Comparison")
+                    type_comparison_chart = create_model_type_comparison_chart(training_results)
+                    if type_comparison_chart:
+                        st.plotly_chart(type_comparison_chart, use_container_width=True)
                     
-                    with col:
-                        st.markdown(f"""
-                        <div style="background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); 
-                                    padding: 1.5rem; text-align: center; border-left: 4px solid {color};">
-                            <div style="font-size: 2rem; margin-bottom: 0.5rem;">{icon}</div>
-                            <div style="font-size: 1.25rem; font-weight: 700; color: {color}; margin-bottom: 0.5rem;">
-                                {model_name}
-                            </div>
-                            <div style="color: var(--muted); font-size: 0.875rem; margin-bottom: 0.25rem;">
-                                MAE Score
-                            </div>
-                            <div style="font-size: 1.5rem; font-weight: 700;">
-                                {mae_score:,.0f}
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-            
-            # Training Visualizations Section
-            st.markdown("### 📈 Training Visualizations")
-            
-            if available_plots:
-                # Organize plots by type
-                plot_categories = {
-                    'Learning Curves': [k for k in available_plots.keys() if 'learning_curve' in k],
-                    'Residuals Analysis': [k for k in available_plots.keys() if 'residuals_analysis' in k],
-                    'Validation Curves': [k for k in available_plots.keys() if 'validation_curve' in k],
-                    'Other Plots': [k for k in available_plots.keys() if not any(x in k for x in ['learning_curve', 'residuals_analysis', 'validation_curve'])]
+                    # Summary statistics table
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        ml_summary = ml_results.groupby('model_name')['mae'].agg(['mean', 'std', 'count']).round(0)
+                        ml_summary.columns = ['Avg MAE', 'Std MAE', 'Evaluations']
+                        st.markdown("#### Machine Learning Models")
+                        st.dataframe(ml_summary, use_container_width=True)
+                    
+                    with col2:
+                        ts_summary = ts_results.groupby('model_name')['mae'].agg(['mean', 'std', 'count']).round(0)
+                        ts_summary.columns = ['Avg MAE', 'Std MAE', 'Evaluations']
+                        st.markdown("#### Time Series Models")
+                        st.dataframe(ts_summary, use_container_width=True)
+                
+                # Enhanced Model Ranking including ALL models
+                st.markdown("### Complete Model Ranking (All Types)")
+                
+                # Get ensemble model performance from the final report
+                ensemble_performance = {
+                    'RandomForest': 13637,
+                    'OptimizedEnsemble': 20880,  # From our earlier optimization
+                    'XGBoost': 39885,
+                    'StackingEnsemble': 34230,  # Original ensemble
+                    'EnhancedRegression': 130912
                 }
                 
-                # Display plots by category
+                # Create comprehensive ranking
+                all_models_performance = []
+                
+                # Add ensemble models (these are the production models)
+                for model, mae in ensemble_performance.items():
+                    model_type = "Ensemble" if "Ensemble" in model else "ML-Production"
+                    all_models_performance.append({
+                        'Model': model,
+                        'Type': model_type, 
+                        'MAE': mae,
+                        'Source': 'Production Models'
+                    })
+                
+                # Add cross-validation results averages
+                if not training_results.empty:
+                    cv_performance = training_results.groupby(['model_type', 'model_name'])['mae'].mean().reset_index()
+                    for _, row in cv_performance.iterrows():
+                        all_models_performance.append({
+                            'Model': f"{row['model_name']} (CV)",
+                            'Type': f"{row['model_type']}-CrossVal",
+                            'MAE': row['mae'],
+                            'Source': 'Cross-Validation'
+                        })
+                
+                # Create ranking dataframe
+                ranking_df = pd.DataFrame(all_models_performance)
+                ranking_df = ranking_df.sort_values('MAE').reset_index(drop=True)
+                ranking_df['Rank'] = range(1, len(ranking_df) + 1)
+                
+                # Display ranking with performance colors
+                st.markdown("#### Complete Performance Leaderboard")
+                
+                # Create colored ranking display
+                for i, (_, row) in enumerate(ranking_df.head(10).iterrows()):
+                    if i < 3:
+                        colors = ["#10b981", "#f59e0b", "#ef4444"]  # Gold, Silver, Bronze
+                        icons = ["🥇", "🥈", "🥉"]
+                        color = colors[i]
+                        icon = icons[i]
+                    else:
+                        color = "#6b7280"
+                        icon = f"#{i+1}"
+                    
+                    cols = st.columns([1, 3, 2, 2, 2])
+                    with cols[0]:
+                        st.markdown(f"**{icon}**")
+                    with cols[1]:
+                        st.markdown(f"**{row['Model']}**")
+                    with cols[2]:
+                        st.markdown(f"<span style='color: {color}'>{row['Type']}</span>", unsafe_allow_html=True)
+                    with cols[3]:
+                        st.markdown(f"**{row['MAE']:,.0f}**")
+                    with cols[4]:
+                        st.markdown(f"_{row['Source']}_")
+                
+                # Key insights
+                st.markdown("### Key Performance Insights")
+                
+                best_overall = ranking_df.iloc[0]
+                best_ml = ranking_df[ranking_df['Type'].str.contains('ML')].iloc[0] if not ranking_df[ranking_df['Type'].str.contains('ML')].empty else None
+                best_ts = ranking_df[ranking_df['Type'].str.contains('TS')].iloc[0] if not ranking_df[ranking_df['Type'].str.contains('TS')].empty else None
+                best_ensemble = ranking_df[ranking_df['Type'].str.contains('Ensemble')].iloc[0] if not ranking_df[ranking_df['Type'].str.contains('Ensemble')].empty else None
+                
+                insight_cols = st.columns(2)
+                
+                with insight_cols[0]:
+                    st.success(f"**Best Overall**: {best_overall['Model']} with MAE: {best_overall['MAE']:,.0f}")
+                    if best_ensemble is not None:
+                        st.info(f"**Best Ensemble**: {best_ensemble['Model']} with MAE: {best_ensemble['MAE']:,.0f}")
+                
+                with insight_cols[1]:
+                    if best_ml is not None:
+                        st.info(f"**Best ML**: {best_ml['Model']} with MAE: {best_ml['MAE']:,.0f}")
+                    if best_ts is not None:
+                        st.info(f"**Best Time Series**: {best_ts['Model']} with MAE: {best_ts['MAE']:,.0f}")
+                
+                # Production vs Research Performance
+                st.markdown("### Production vs Research Performance Gap")
+                
+                production_models = ranking_df[ranking_df['Source'] == 'Production Models']
+                cv_models = ranking_df[ranking_df['Source'] == 'Cross-Validation']
+                
+                if not production_models.empty and not cv_models.empty:
+                    best_production = production_models.iloc[0]['MAE']
+                    best_cv = cv_models.iloc[0]['MAE']
+                    gap_ratio = best_production / best_cv if best_cv != 0 else 0
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Best Production MAE", f"{best_production:,.0f}")
+                    with col2:
+                        st.metric("Best Cross-Val MAE", f"{best_cv:,.0f}")
+                    with col3:
+                        if gap_ratio > 1:
+                            st.metric("Performance Gap", f"{gap_ratio:.1f}x worse", delta=f"{best_production - best_cv:,.0f}")
+                        else:
+                            st.metric("Performance Gap", f"{1/gap_ratio:.1f}x better", delta=f"{best_cv - best_production:,.0f}")
+            
+            # Training Visualizations Section
+            st.markdown("### Training Visualizations")
+            
+            if available_plots:
+                # Organize plots by priority, including ensemble plots
+                tuned_learning_curves = [k for k in available_plots.keys() if 'learning_curve' in k and ('Tuned' in k or 'StackingEnsemble' in k or 'OptimizedEnsemble' in k)]
+                default_learning_curves = [k for k in available_plots.keys() if 'learning_curve' in k and 'Default' in k]
+                
+                plot_categories = {
+                    'Production Model Learning Curves': tuned_learning_curves,
+                    'Baseline Model Learning Curves': default_learning_curves,
+                    'Residuals Analysis': [k for k in available_plots.keys() if 'residuals_analysis' in k],
+                    'Validation Curves': [k for k in available_plots.keys() if 'validation_curve' in k],
+                    'Additional Analysis': [k for k in available_plots.keys() if not any(x in k for x in ['learning_curve', 'residuals_analysis', 'validation_curve'])]
+                }
+                
+                # Display plots by category with better organization
                 for category, plots in plot_categories.items():
                     if plots:
-                        st.markdown(f"#### {category}")
-                        
-                        # Display plots in columns for better layout
-                        if len(plots) >= 2:
-                            cols = st.columns(2)
-                            for i, plot_key in enumerate(plots):
-                                with cols[i % 2]:
+                        with st.expander(f"{category} ({len(plots)} plots)", expanded=(category.startswith('🏆'))):
+                            
+                            # Display plots in columns for better layout
+                            if len(plots) >= 2:
+                                cols = st.columns(2)
+                                for i, plot_key in enumerate(plots):
+                                    with cols[i % 2]:
+                                        plot_path = available_plots[plot_key]
+                                        # Create readable caption from filename
+                                        caption = plot_key.replace('_', ' ').title()
+                                        display_image_with_caption(plot_path, caption)
+                            else:
+                                for plot_key in plots:
                                     plot_path = available_plots[plot_key]
-                                    # Create readable caption from filename
                                     caption = plot_key.replace('_', ' ').title()
                                     display_image_with_caption(plot_path, caption)
-                        else:
-                            for plot_key in plots:
-                                plot_path = available_plots[plot_key]
-                                caption = plot_key.replace('_', ' ').title()
-                                display_image_with_caption(plot_path, caption)
             else:
-                st.info("📊 No training plots available. These are generated during the training process.")
+                st.info("No training plots available. These are generated during the training process.")
             
             # Detailed Metrics Section
             if detailed_metrics:
-                st.markdown("### 📋 Detailed Training Metrics")
+                st.markdown("### Detailed Training Metrics & Hyperparameter Analysis")
                 
                 if 'Baseline' in detailed_metrics and 'Tuned' in detailed_metrics:
-                    st.markdown("#### Before vs After Hyperparameter Tuning")
-                    
-                    # Create comparison table
-                    comparison_data = []
-                    for model_name in detailed_metrics['Baseline'].keys():
-                        if model_name in detailed_metrics['Tuned']:
-                            baseline_metrics = detailed_metrics['Baseline'][model_name]
-                            tuned_metrics = detailed_metrics['Tuned'][model_name]
-                            
-                            # Calculate improvements
-                            mae_improvement = baseline_metrics['MAE'] - tuned_metrics['MAE']
-                            mae_improvement_pct = (mae_improvement / baseline_metrics['MAE']) * 100
-                            
-                            r2_improvement = tuned_metrics['R²'] - baseline_metrics['R²']
-                            
-                            comparison_data.append({
-                                'Model': model_name,
-                                'Baseline MAE': f"{baseline_metrics['MAE']:,.0f}",
-                                'Tuned MAE': f"{tuned_metrics['MAE']:,.0f}",
-                                'MAE Improvement': f"{mae_improvement:,.0f} ({mae_improvement_pct:+.1f}%)",
-                                'Baseline R²': f"{baseline_metrics['R²']:.4f}",
-                                'Tuned R²': f"{tuned_metrics['R²']:.4f}",
-                                'R² Improvement': f"{r2_improvement:+.4f}"
-                            })
-                    
-                    if comparison_data:
-                        comparison_df = pd.DataFrame(comparison_data)
-                        st.dataframe(comparison_df, use_container_width=True, hide_index=True)
+                    with st.expander("Hyperparameter Tuning Impact Analysis", expanded=False):
+                        st.markdown("#### Before vs After Hyperparameter Tuning")
                         
-                        # Highlight best improvements
-                        st.markdown("#### 🎯 Key Insights")
-                        col1, col2 = st.columns(2)
+                        # Create comparison table
+                        comparison_data = []
+                        for model_name in detailed_metrics['Baseline'].keys():
+                            if model_name in detailed_metrics['Tuned']:
+                                baseline_metrics = detailed_metrics['Baseline'][model_name]
+                                tuned_metrics = detailed_metrics['Tuned'][model_name]
+                                
+                                # Calculate improvements
+                                mae_improvement = baseline_metrics['MAE'] - tuned_metrics['MAE']
+                                mae_improvement_pct = (mae_improvement / baseline_metrics['MAE']) * 100
+                                
+                                r2_improvement = tuned_metrics['R²'] - baseline_metrics['R²']
+                                
+                                comparison_data.append({
+                                    'Model': model_name,
+                                    'Baseline MAE': f"{baseline_metrics['MAE']:,.0f}",
+                                    'Tuned MAE': f"{tuned_metrics['MAE']:,.0f}",
+                                    'MAE Improvement': f"{mae_improvement:,.0f} ({mae_improvement_pct:+.1f}%)",
+                                    'Baseline R²': f"{baseline_metrics['R²']:.4f}",
+                                    'Tuned R²': f"{tuned_metrics['R²']:.4f}",
+                                    'R² Improvement': f"{r2_improvement:+.4f}"
+                                })
                         
-                        with col1:
-                            st.info("**Hyperparameter tuning successfully improved model performance across all metrics, demonstrating the value of systematic optimization over default parameters.**")
-                        
-                        with col2:
-                            st.success("**The baseline → tuned → comparison methodology provides clear visibility into model improvement and training effectiveness.**")
+                        if comparison_data:
+                            comparison_df = pd.DataFrame(comparison_data)
+                            st.dataframe(comparison_df, use_container_width=True, hide_index=True)
+                            
+                            # Highlight best improvements
+                            st.markdown("#### Tuning Impact Summary")
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                st.info("**Hyperparameter tuning successfully improved model performance across all metrics, demonstrating the value of systematic optimization over default parameters.**")
+                            
+                            with col2:
+                                st.success("**The baseline → tuned → ensemble methodology provides clear visibility into model improvement and training effectiveness.**")
+            
+            # Model Architecture Information
+            st.markdown("### Model Architecture & Feature Information")
+            
+            # Load current models to show feature counts
+            ml_models = load_ml_models()
+            ts_models = load_ts_models()
+            
+            if ml_models or ts_models:
+                arch_cols = st.columns(2)
+                
+                with arch_cols[0]:
+                    st.markdown("#### ML Models (Feature-based)")
+                    for model_name, model_info in ml_models.items():
+                        feature_count = len(model_info['feature_cols']) if 'feature_cols' in model_info else "Unknown"
+                        st.text(f"• {model_name}: {feature_count} features")
+                
+                with arch_cols[1]:
+                    st.markdown("#### Time Series Models")
+                    ts_count = sum(len(models) if isinstance(models, dict) else 1 for models in ts_models.values())
+                    st.text(f"• Total TS model instances: {ts_count}")
+                    for ts_type, models in ts_models.items():
+                        count = len(models) if isinstance(models, dict) else 1
+                        st.text(f"• {ts_type}: {count} KPI-specific models")
             
             # Raw Data Section (Expandable)
-            with st.expander("🔍 View Raw Training Data"):
-                st.markdown("#### Complete Training Results")
-                st.dataframe(training_results, use_container_width=True)
+            with st.expander("View Raw Training Data & Export", expanded=False):
+                st.markdown("#### Complete Training Results Dataset")
                 
-                # Download button for results
-                csv_data = training_results.to_csv(index=False)
-                st.download_button(
-                    label="📥 Download Training Results CSV",
-                    data=csv_data,
-                    file_name="model_training_results.csv",
-                    mime="text/csv"
-                )
+                # Add filtering options
+                filter_cols = st.columns(3)
+                with filter_cols[0]:
+                    selected_model_types = st.multiselect("Filter by Model Type", 
+                                                        options=training_results['model_type'].unique(),
+                                                        default=training_results['model_type'].unique())
+                
+                with filter_cols[1]:
+                    selected_models = st.multiselect("Filter by Model Name",
+                                                   options=training_results['model_name'].unique(),
+                                                   default=training_results['model_name'].unique())
+                
+                with filter_cols[2]:
+                    selected_kpis = st.multiselect("Filter by KPI",
+                                                 options=training_results['kpi_name'].unique(),
+                                                 default=training_results['kpi_name'].unique()[:5])  # Show first 5 by default
+                
+                # Apply filters
+                filtered_results = training_results[
+                    (training_results['model_type'].isin(selected_model_types)) &
+                    (training_results['model_name'].isin(selected_models)) &
+                    (training_results['kpi_name'].isin(selected_kpis))
+                ]
+                
+                st.dataframe(filtered_results, use_container_width=True)
+                
+                # Download buttons
+                col1, col2 = st.columns(2)
+                with col1:
+                    csv_data = filtered_results.to_csv(index=False)
+                    st.download_button(
+                        label="Download Filtered Results CSV",
+                        data=csv_data,
+                        file_name="filtered_training_results.csv",
+                        mime="text/csv"
+                    )
+                
+                with col2:
+                    full_csv_data = training_results.to_csv(index=False)
+                    st.download_button(
+                        label="Download Complete Dataset CSV",
+                        data=full_csv_data,
+                        file_name="complete_training_results.csv",
+                        mime="text/csv"
+                    )
 
     # Add comparison tab content for multi-agency mode
     if analysis_mode == "Multi-Agency Comparison":

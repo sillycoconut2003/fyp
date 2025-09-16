@@ -75,7 +75,7 @@ html, body, .stApp {
 [data-testid="stSidebar"] h3 { 
     color: var(--text);
     font-weight: 700;
-    margin: var(--space-6) 0 var(--space-4) 0;
+    margin: var(--space-3) 0 var(--space-3) 0;
     padding-bottom: var(--space-2);
     position: relative;
 }
@@ -130,7 +130,7 @@ html, body, .stApp {
     color: white !important;
     border: none !important;
     border-radius: var(--radius) !important;
-    padding: var(--space-3) var(--space-4) !important;
+    padding: var(--space-2) var(--space-2) !important;
     font-weight: 600 !important;
     font-size: var(--text-sm) !important;
     text-transform: uppercase !important;
@@ -330,3 +330,116 @@ h1 a, h2 a, h3 a, h4 a, h5 a, h6 a {
     display: none !important;
 }
 
+/*--- Multi-Agency Comparison Enhancements ---*/
+/* Ensure proper spacing for multi-agency stats */
+.element-container:has(.stMetric) {
+    margin-bottom: var(--space-4) !important;
+}
+
+/* Improve multi-select styling */
+[data-testid="stSidebar"] .stMultiSelect > div > div {
+    background: var(--card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s ease;
+}
+
+[data-testid="stSidebar"] .stMultiSelect > div > div:hover {
+    border-color: var(--accent) !important;
+    box-shadow: var(--shadow-md);
+}
+
+/* Multi-select tags styling */
+[data-testid="stSidebar"] .stMultiSelect span[data-baseweb="tag"] {
+    background: var(--accent) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: var(--radius-sm) !important;
+    font-size: var(--text-xs) !important;
+    font-weight: 600 !important;
+    margin: var(--space-1) !important;
+}
+
+/* Progress bar styling */
+.stProgress > div > div > div {
+    background: linear-gradient(90deg, var(--accent) 0%, var(--accent-600) 100%) !important;
+    border-radius: var(--radius) !important;
+}
+
+/* Plotly chart container improvements */
+.js-plotly-plot {
+    border-radius: var(--radius) !important;
+    overflow: hidden !important;
+}
+
+/* Ensure proper spacing between chart and stats */
+.element-container:has(.js-plotly-plot) + .element-container {
+    margin-top: var(--space-6) !important;
+}
+
+/* Multi-agency stats grid improvements */
+.stColumns > div {
+    padding: 0 var(--space-2) !important;
+}
+
+.stColumns > div:first-child {
+    padding-left: 0 !important;
+}
+
+.stColumns > div:last-child {
+    padding-right: 0 !important;
+}
+
+/* Metric card enhancements for multi-agency */
+[data-testid="metric-container"] {
+    background: var(--card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    padding: var(--space-4) !important;
+    box-shadow: var(--shadow-sm) !important;
+    transition: all 0.2s ease !important;
+}
+
+[data-testid="metric-container"]:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: var(--shadow-md) !important;
+}
+
+/* Improve tab styling */
+[data-testid="stTabs"] [data-baseweb="tab-list"] {
+    gap: var(--space-4) !important;
+    border-bottom: 1px solid var(--border) !important;
+    margin-bottom: var(--space-6) !important;
+}
+
+[data-testid="stTabs"] [data-baseweb="tab"] {
+    padding: var(--space-3) var(--space-5) !important;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0 !important;
+    transition: all 0.2s ease !important;
+}
+
+/* Loading spinner improvements */
+.stSpinner > div {
+    border-color: var(--accent) transparent var(--accent) transparent !important;
+}
+
+/* Info/warning/success message improvements */
+.stAlert {
+    border-radius: var(--radius) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+.stAlert[data-baseweb="notification"] {
+    background: var(--card) !important;
+}
+
+/* Ensure proper spacing in sidebar sections */
+[data-testid="stSidebar"] .element-container {
+    margin-bottom: var(--space-3) !important;
+}
+
+[data-testid="stSidebar"] .stMarkdown:has(h3) + .element-container {
+    margin-top: var(--space-2) !important;
+}

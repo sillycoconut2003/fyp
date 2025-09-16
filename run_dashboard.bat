@@ -9,6 +9,8 @@ echo ========================================
 echo.
 echo Loading optimized models:
 echo    - RandomForest: 13,637 MAE (CHAMPION - Best Performance)
+echo    - OptimizedEnsemble: 20,880 MAE (NEW! RF+XGB Only, +39%% vs Original)
+echo    - StackingEnsemble: 34,230 MAE (Original 3-model ensemble)
 echo    - XGBoost: 39,885 MAE (+192%% vs RandomForest)
 echo    - Ridge Regression: 131,278 MAE (ElasticNet α=0.001, l1_ratio=0.9)
 echo    - Time Series: 264 Prophet + SARIMA models
