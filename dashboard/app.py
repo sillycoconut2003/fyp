@@ -41,7 +41,7 @@ def load_data():
     fp = Path(__file__).resolve().parents[1]/"data"/"processed"/"mta_model.parquet"
     #fp = "../data/processed/mta_model.parquet"
     # try:
-    #     return pd.read_parquet(fp)
+    return pd.read_parquet(fp)
     # except FileNotFoundError:
     #     st.error("🚨 **Data File Missing for Streamlit Cloud Deployment**")
     #     st.markdown("""
