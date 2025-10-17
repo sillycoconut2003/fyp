@@ -37,9 +37,9 @@ data/processed/*
 !data/interim/.gitkeep
 !data/processed/.gitkeep
 
-# Model files (exclude large model files)
-models/*.pkl
-models/time_series/*.pkl
+# Model files (now tracked with Git LFS)
+!models/*.pkl
+!models/time_series/*.pkl
 !models/.gitkeep
 !models/time_series/.gitkeep
 
