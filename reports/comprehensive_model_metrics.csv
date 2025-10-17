@@ -1,0 +1,9 @@
+model_name,model_type,mae,rmse,mape,kpi_count,data_source,tuning_status
+Prophet Baseline,TS,78344.85,91059.32,9.37,132,Aggregate Training Results,Baseline
+Prophet Tuned,TS,75922.55,85785.59,8.88,132,Aggregate Training Results,Hyperparameter Tuned
+SARIMA Baseline,TS,93580.65,112525.66,10.52,132,Aggregate Training Results,Baseline
+SARIMA Tuned,TS,94511.65,115291.39,14.74,132,Aggregate Training Results,Hyperparameter Tuned (Degraded)
+RandomForest,ML,13637.0,,,Variable per KPI,Production Ensemble,Optimized
+OptimizedEnsemble,ML,20880.0,,,Variable per KPI,Production Ensemble,Ensemble (RF+XGB)
+XGBoost,ML,39885.0,,,Variable per KPI,Production Ensemble,Optimized
+EnhancedRegression,ML,130912.0,,,Variable per KPI,Production Ensemble,Ridge Tuned

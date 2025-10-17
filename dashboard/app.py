@@ -279,20 +279,6 @@ def create_model_type_comparison_chart(results_df):
     return fig
 
 def calculate_ml_confidence_intervals(model, df_extended, feature_cols, predictions, confidence_level=0.8, n_bootstrap=100):
-    """
-    Calculate confidence intervals for ML predictions using residual bootstrap.
-    
-    Args:
-        model: Trained ML model
-        df_extended: Historical data with features
-        feature_cols: List of feature column names
-        predictions: Point predictions
-        confidence_level: Confidence level (0.8 = 80%)
-        n_bootstrap: Number of bootstrap samples
-    
-    Returns:
-        tuple: (lower_bounds, upper_bounds)
-    """
     try:
         # Calculate residuals from historical predictions
         historical_features = pd.DataFrame()
@@ -386,7 +372,6 @@ def calculate_ml_confidence_intervals(model, df_extended, feature_cols, predicti
     return fallback_lower, fallback_upper
 
 def simple_trend_forecast(df, periods=12):
-    """Simple fallback forecasting using linear trend"""
     values = df['MONTHLY_ACTUAL'].values
     x = np.arange(len(values))
     slope, intercept = np.polyfit(x, values, 1)
@@ -399,7 +384,6 @@ def simple_trend_forecast(df, periods=12):
     return predictions
 
 def predict_ml_model(df, model_info, model_name, periods=12, kpi_name=""):
-    """Make predictions with a feature-based ML model using iterative forecasting."""
     print(f"🚀 Starting {model_name} prediction for {kpi_name}")
     print(f"   Data shape: {df.shape}, Periods: {periods}")
     
@@ -654,7 +638,6 @@ def predict_ml_model(df, model_info, model_name, periods=12, kpi_name=""):
         return pd.DataFrame()
 
 def predict_ts_model(df, model_info, model_name, periods=12):
-    """Make predictions with time series model"""
     try:
         # Extract the actual model from the model info dictionary
         if isinstance(model_info, dict) and 'model' in model_info:
@@ -813,7 +796,6 @@ def predict_ts_model(df, model_info, model_name, periods=12):
         return pd.DataFrame()
 
 def render_stat_card(title: str, value: str, delta_text: str = "", delta_type: str = "neutral") -> str:
-    """Return HTML for a professional stat card with delta coloring."""
     # Determine delta class from explicit type if provided; otherwise infer from sign
     inferred_type = 'neutral'
     if delta_text:

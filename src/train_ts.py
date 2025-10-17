@@ -4,8 +4,6 @@ MTA KPI Time Series Forecasting Training Pipeline
 Trains Prophet and SARIMA models for individual agency-indicator combinations.
 This module handles time series specific forecasting for 264 unique MTA KPIs,
 providing complementary predictions to the cross-series ML models.
-
-Author: FYP Project - MTA Performance Prediction System
 """
 
 import pandas as pd
@@ -36,30 +34,12 @@ warnings.filterwarnings('ignore')
 pd.set_option('display.max_columns', None)
 
 def load_processed_data():
-    """
-    Load the processed MTA dataset for time series training.
-    
-    Returns:
-        pd.DataFrame: Processed MTA performance data
-    """
     print(f"📊 Loading processed data from: {PROCESSED}")
     df = pd.read_parquet(PROCESSED)
     print(f"✓ Loaded dataset: {df.shape[0]} records, {df.shape[1]} columns")
     return df
 
 def get_agency_indicator_combinations(df):
-    """
-    Identify all viable agency-indicator combinations for time series modeling.
-    
-    Filters combinations to ensure sufficient historical data for reliable
-    time series forecasting (minimum 24 months of data).
-    
-    Args:
-        df: MTA performance DataFrame
-        
-    Returns:
-        pd.DataFrame: Filtered combinations with adequate data points
-    """
     print("\n🔍 Analyzing agency-indicator combinations...")
     combinations = df.groupby([COLS['agency'], COLS['indicator']]).size().reset_index(name='count')
     
@@ -73,17 +53,6 @@ def get_agency_indicator_combinations(df):
     return combinations
 
 def prepare_series_data(df, agency, indicator):
-    """
-    Prepare time series data for specific agency-indicator combination.
-    
-    Args:
-        df: Full MTA DataFrame
-        agency: Target agency
-        indicator: Target performance indicator
-        
-    Returns:
-        pd.DataFrame: Clean time series data for modeling
-    """
     series_df = df[
         (df[COLS['agency']] == agency) & 
         (df[COLS['indicator']] == indicator)
@@ -100,19 +69,6 @@ def prepare_series_data(df, agency, indicator):
     return series_df
 
 def split_series_temporal(series_df, test_months=12):
-    """
-    Perform temporal split for time series validation.
-    
-    Maintains chronological order critical for time series modeling.
-    Uses last N months for testing to simulate real-world forecasting.
-    
-    Args:
-        series_df: Time series data for single agency-indicator
-        test_months: Number of months to reserve for testing
-        
-    Returns:
-        tuple: (train_df, test_df) or (None, None) if insufficient data
-    """
     min_training_months = 12
     min_total_months = test_months + min_training_months
     
@@ -127,19 +83,6 @@ def split_series_temporal(series_df, test_months=12):
     return train_df, test_df
 
 def train_prophet_model_baseline(train_df, test_df, agency, indicator):
-    """
-    Train Facebook Prophet model with DEFAULT parameters first to establish baseline.
-    
-    Args:
-        train_df: Training data for the time series
-        test_df: Test data for evaluation
-        agency: Agency name for identification
-        indicator: Performance indicator name
-        
-    Returns:
-        dict: Model results including trained model, predictions, and metrics
-        None: If insufficient data or training fails
-    """
     try:
         # Prepare data in Prophet format (ds, y columns)
         prophet_df = train_df[['YYYY_MM', 'MONTHLY_ACTUAL']].copy()
@@ -153,17 +96,13 @@ def train_prophet_model_baseline(train_df, test_df, agency, indicator):
         if len(prophet_df) < min_data_points:
             return None
         
-        # Configure Prophet with DEFAULT parameters (conservative)
+        # Configure Prophet with DEFAULT parameters 
         model = Prophet(
             yearly_seasonality='auto',      # Default seasonal detection
             weekly_seasonality=False,       # Not relevant for monthly data
             daily_seasonality=False,        # Not relevant for monthly data
-            # Default changepoint_prior_scale=0.05
-            # Default seasonality_prior_scale=10.0  
-            # Default interval_width=0.8
         )
         
-        # Suppress Prophet's verbose output
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             model.fit(prophet_df)
@@ -206,19 +145,6 @@ def train_prophet_model_baseline(train_df, test_df, agency, indicator):
         return None
 
 def train_prophet_model_tuned(train_df, test_df, agency, indicator):
-    """
-    Train Facebook Prophet model with OPTIMIZED parameters for comparison.
-    
-    Args:
-        train_df: Training data for the time series
-        test_df: Test data for evaluation
-        agency: Agency name for identification
-        indicator: Performance indicator name
-        
-    Returns:
-        dict: Model results including trained model, predictions, and metrics
-        None: If insufficient data or training fails
-    """
     try:
         # Prepare data in Prophet format (ds, y columns)
         prophet_df = train_df[['YYYY_MM', 'MONTHLY_ACTUAL']].copy()
@@ -235,8 +161,8 @@ def train_prophet_model_tuned(train_df, test_df, agency, indicator):
         # Configure Prophet with OPTIMIZED parameters
         model = Prophet(
             yearly_seasonality=True,        # Capture annual patterns
-            weekly_seasonality=False,       # Not relevant for monthly data
-            daily_seasonality=False,        # Not relevant for monthly data
+            weekly_seasonality=False,       
+            daily_seasonality=False,        
             changepoint_prior_scale=0.05,   # Conservative trend changes
             seasonality_prior_scale=10.0,   # Allow moderate seasonality
             interval_width=0.8,             # 80% prediction intervals
@@ -284,182 +210,9 @@ def train_prophet_model_tuned(train_df, test_df, agency, indicator):
     except Exception as e:
         print(f"   ❌ Prophet tuned training failed for {agency} - {indicator}: {str(e)}")
         return None
-    """
-    Train Facebook Prophet model with OPTIMIZED parameters for comparison.
-    
-    Prophet is designed for time series with strong seasonal patterns and
-    handles missing data well. This version uses optimized parameters for MTA monthly data.
-    
-    Args:
-        train_df: Training data for the time series
-        test_df: Test data for evaluation
-        agency: Agency name for identification
-        indicator: Performance indicator name
-        
-    Returns:
-        dict: Model results including trained model, predictions, and metrics
-        None: If insufficient data or training fails
-    """
-    try:
-        # Prepare data in Prophet format (ds, y columns)
-        prophet_df = train_df[['YYYY_MM', 'MONTHLY_ACTUAL']].copy()
-        prophet_df.columns = ['ds', 'y']
-        
-        # Clean data for Prophet requirements
-        prophet_df = prophet_df.dropna()
-        
-        # Minimum data requirement check
-        min_data_points = 12
-        if len(prophet_df) < min_data_points:
-            return None
-        
-        # Configure Prophet for MTA monthly data with OPTIMIZED parameters
-        model = Prophet(
-            yearly_seasonality=True,        # Force annual patterns (optimized)
-            weekly_seasonality=False,       # Not relevant for monthly data
-            daily_seasonality=False,        # Not relevant for monthly data
-            changepoint_prior_scale=0.05,   # Conservative trend changes (optimized)
-            seasonality_prior_scale=10.0,   # Moderate seasonality (optimized)
-            holidays_prior_scale=10.0,      # Handle holiday effects (optimized)
-            interval_width=0.8,             # 80% prediction intervals (optimized)
-            mcmc_samples=0                  # Faster training (optimized)
-        )
-        
-        # Suppress Prophet's verbose output
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            model.fit(prophet_df)
-        
-        # Generate forecasts for test period
-        future = model.make_future_dataframe(periods=len(test_df), freq='MS')
-        forecast = model.predict(future)
-        
-        # Extract predictions for evaluation
-        test_predictions = forecast.tail(len(test_df))['yhat'].values
-        test_actual = test_df['MONTHLY_ACTUAL'].values
-        
-        # Calculate comprehensive metrics
-        test_mae = mae(test_actual, test_predictions)
-        test_rmse = rmse(test_actual, test_predictions)
-        test_mape = mape(test_actual, test_predictions)
-        
-        # Compile comprehensive results
-        results = {
-            'model': model,
-            'model_type': 'Prophet_Tuned',
-            'agency': agency,
-            'indicator': indicator,
-            'test_mae': test_mae,
-            'test_rmse': test_rmse,
-            'test_mape': test_mape,
-            'predictions': test_predictions,
-            'actual': test_actual,
-            'forecast_df': forecast,
-            'series_length': len(prophet_df),
-            'training_periods': len(prophet_df),
-            'test_periods': len(test_df),
-            'parameters': 'optimized'
-        }
-        
-        return results
-        
-    except Exception as e:
-        print(f"   ❌ Prophet tuned training failed for {agency} - {indicator}: {str(e)}")
-        return None
-    """
-    Train Facebook Prophet model for individual time series forecasting.
-    
-    Prophet is designed for time series with strong seasonal patterns and
-    handles missing data well. Optimized for MTA monthly performance data.
-    
-    Args:
-        train_df: Training data for the time series
-        test_df: Test data for evaluation
-        agency: Agency name for identification
-        indicator: Performance indicator name
-        
-    Returns:
-        dict: Model results including trained model, predictions, and metrics
-        None: If insufficient data or training fails
-    """
-    try:
-        # Prepare data in Prophet format (ds, y columns)
-        prophet_df = train_df[['YYYY_MM', 'MONTHLY_ACTUAL']].copy()
-        prophet_df.columns = ['ds', 'y']
-        
-        # Clean data for Prophet requirements
-        prophet_df = prophet_df.dropna()
-        
-        # Minimum data requirement check
-        min_data_points = 12
-        if len(prophet_df) < min_data_points:
-            return None
-        
-        # Configure Prophet for MTA monthly data
-        model = Prophet(
-            yearly_seasonality=True,        # Capture annual patterns
-            weekly_seasonality=False,       # Not relevant for monthly data
-            daily_seasonality=False,        # Not relevant for monthly data
-            changepoint_prior_scale=0.05,   # Conservative trend changes
-            seasonality_prior_scale=10.0,   # Allow moderate seasonality
-            interval_width=0.8              # 80% prediction intervals
-        )
-        
-        # Suppress Prophet's verbose output
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            model.fit(prophet_df)
-        
-        # Generate forecasts for test period
-        future = model.make_future_dataframe(periods=len(test_df), freq='MS')
-        forecast = model.predict(future)
-        
-        # Extract predictions for evaluation
-        test_predictions = forecast.tail(len(test_df))['yhat'].values
-        test_actual = test_df['MONTHLY_ACTUAL'].values
-        
-        # Calculate comprehensive metrics
-        test_mae = mae(test_actual, test_predictions)
-        test_rmse = rmse(test_actual, test_predictions)
-        test_mape = mape(test_actual, test_predictions)
-        
-        # Compile comprehensive results
-        results = {
-            'model': model,
-            'model_type': 'Prophet',
-            'agency': agency,
-            'indicator': indicator,
-            'test_mae': test_mae,
-            'test_rmse': test_rmse,
-            'test_mape': test_mape,
-            'predictions': test_predictions,
-            'actual': test_actual,
-            'forecast_df': forecast,
-            'series_length': len(prophet_df),
-            'training_periods': len(prophet_df),
-            'test_periods': len(test_df)
-        }
-        
-        return results
-        
-    except Exception as e:
-        print(f"   ❌ Prophet training failed for {agency} - {indicator}: {str(e)}")
-        return None
+
 
 def find_best_sarima_params(train_df, max_p=3, max_d=2, max_q=3):
-    """
-    Find optimal SARIMA parameters using Akaike Information Criterion (AIC).
-    
-    Performs grid search over parameter space to identify best-fitting
-    SARIMA configuration for the time series.
-    
-    Args:
-        train_df: Training data for parameter optimization
-        max_p, max_d, max_q: Maximum values for ARIMA parameters
-        
-    Returns:
-        tuple: Best (p,d,q) parameters or None if search fails
-    """
     try:
         best_aic = float('inf')
         best_params = None
@@ -502,19 +255,6 @@ def find_best_sarima_params(train_df, max_p=3, max_d=2, max_q=3):
         return (1, 1, 1)  # Safe fallback parameters
 
 def train_sarima_model_baseline(train_df, test_df, agency, indicator):
-    """
-    Train SARIMA model with DEFAULT/SIMPLE parameters first to establish baseline.
-    
-    Args:
-        train_df: Training data for the time series
-        test_df: Test data for evaluation
-        agency: Agency name for identification
-        indicator: Performance indicator name
-        
-    Returns:
-        dict: Model results including trained model, predictions, and metrics
-        None: If insufficient data or training fails
-    """
     try:
         # Prepare time series data
         ts_data = train_df.set_index('YYYY_MM')['MONTHLY_ACTUAL']
@@ -618,22 +358,6 @@ def train_sarima_model_baseline(train_df, test_df, agency, indicator):
         return None
 
 def train_sarima_model_tuned(train_df, test_df, agency, indicator):
-    """
-    Train SARIMA model with OPTIMIZED parameters for comparison.
-    
-    SARIMA models are excellent for capturing both trend and seasonal patterns
-    in time series data. This version uses parameter optimization for better performance.
-    
-    Args:
-        train_df: Training data for the time series
-        test_df: Test data for evaluation
-        agency: Agency name for identification
-        indicator: Performance indicator name
-        
-    Returns:
-        dict: Model results including trained model, predictions, and metrics
-        None: If insufficient data or training fails
-    """
     try:
         # Prepare time series data
         ts_data = train_df.set_index('YYYY_MM')['MONTHLY_ACTUAL']
@@ -738,141 +462,8 @@ def train_sarima_model_tuned(train_df, test_df, agency, indicator):
     except Exception as e:
         print(f"   ❌ SARIMA tuned training failed for {agency} - {indicator}: {str(e)}")
         return None
-    """
-    Train SARIMA (Seasonal ARIMA) model for individual time series.
-    
-    SARIMA models are excellent for capturing both trend and seasonal patterns
-    in time series data. Optimized for MTA monthly performance indicators.
-    
-    Args:
-        train_df: Training data for the time series
-        test_df: Test data for evaluation
-        agency: Agency name for identification
-        indicator: Performance indicator name
-        
-    Returns:
-        dict: Model results including trained model, predictions, and metrics
-        None: If insufficient data or training fails
-    """
-    try:
-        # Prepare time series data
-        ts_data = train_df.set_index('YYYY_MM')['MONTHLY_ACTUAL']
-        ts_data = ts_data.asfreq('MS')  # Monthly start frequency
-        
-        # Minimum data requirement for seasonal modeling
-        min_seasonal_data = 24  # 2 years for seasonal patterns
-        if len(ts_data) < min_seasonal_data:
-            return None
-        
-        # Optimize SARIMA parameters
-        best_params = find_best_sarima_params(train_df)
-        
-        # Train SARIMA model with optimal parameters
-        model = SARIMAX(
-            ts_data, 
-            order=best_params, 
-            seasonal_order=(1, 1, 1, 12),  # Monthly seasonality
-            enforce_stationarity=False,
-            enforce_invertibility=False
-        )
-        
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            fitted_model = model.fit(disp=False, maxiter=200)
-        
-        # Generate forecasts for test period
-        forecast_steps = len(test_df)
-        forecast = fitted_model.forecast(steps=forecast_steps)
-        
-        # Prepare evaluation data
-        test_actual = test_df['MONTHLY_ACTUAL'].values
-        test_predictions = forecast.values
-        
-        # Validate predictions for numerical stability
-        historical_max = train_df['MONTHLY_ACTUAL'].max()
-        historical_mean = train_df['MONTHLY_ACTUAL'].mean()
-        
-        # Check for extreme predictions that indicate numerical instability
-        if (np.any(np.abs(test_predictions) > 1e10) or 
-            np.any(np.isnan(test_predictions)) or 
-            np.any(np.isinf(test_predictions)) or
-            np.any(np.abs(test_predictions) > 100 * historical_max)):
-            
-            print(f"   ⚠️  SARIMA predictions unstable for {agency} - {indicator}")
-            print(f"      Prediction range: {test_predictions.min():.2e} to {test_predictions.max():.2e}")
-            print(f"      Historical max: {historical_max:.2f}")
-            
-            # Use simple trend-based fallback for unstable models
-            recent_trend = train_df['MONTHLY_ACTUAL'].tail(6).mean()
-            test_predictions = np.full(len(test_predictions), recent_trend)
-            print(f"      Using trend-based fallback: {recent_trend:.2f}")
-        
-        # Ensure non-negative predictions
-        test_predictions = np.maximum(test_predictions, 0)
-        
-        # Calculate comprehensive metrics
-        test_mae = mae(test_actual, test_predictions)
-        test_rmse = rmse(test_actual, test_predictions)
-        test_mape = mape(test_actual, test_predictions)
-        
-        # Final validation check on metrics
-        if test_mae > 1e10 or test_rmse > 1e10 or test_mape > 1e10:
-            print(f"   ⚠️  Extreme metrics detected for {agency} - {indicator}")
-            print(f"      MAE: {test_mae:.2e}, RMSE: {test_rmse:.2e}, MAPE: {test_mape:.2e}%")
-            
-            # Fallback to simple baseline metrics
-            baseline_pred = np.full(len(test_actual), historical_mean)
-            test_mae = mae(test_actual, baseline_pred)
-            test_rmse = rmse(test_actual, baseline_pred)  
-            test_mape = mape(test_actual, baseline_pred)
-            test_predictions = baseline_pred
-            
-            print(f"      Using baseline metrics: MAE={test_mae:.2f}")
-        
-        # Additional sanity check - cap extreme values
-        test_mae = min(test_mae, historical_max * 10)  # Cap at 10x historical max
-        test_rmse = min(test_rmse, historical_max * 20)  # Cap at 20x historical max
-        test_mape = min(test_mape, 1000)  # Cap MAPE at 1000%
-        
-        # Compile comprehensive results
-        results = {
-            'model': fitted_model,
-            'model_type': 'SARIMA',
-            'agency': agency,
-            'indicator': indicator,
-            'best_params': best_params,
-            'seasonal_order': (1, 1, 1, 12),
-            'test_mae': test_mae,
-            'test_rmse': test_rmse,
-            'test_mape': test_mape,
-            'predictions': test_predictions,
-            'actual': test_actual,
-            'series_length': len(ts_data),
-            'training_periods': len(ts_data),
-            'test_periods': len(test_df)
-        }
-        
-        return results
-        
-    except Exception as e:
-        print(f"   ❌ SARIMA training failed for {agency} - {indicator}: {str(e)}")
-        return None
 
 def train_all_series_before_after(df, combinations, max_series=None):
-    """
-    Train Prophet and SARIMA models with BEFORE/AFTER comparison for all viable time series.
-    
-    This function orchestrates the training of baseline and tuned time series models
-    for each agency-indicator combination, providing comprehensive before/after analysis.
-    
-    Args:
-        df: Complete MTA DataFrame
-        combinations: Viable agency-indicator combinations
-        max_series: Optional limit on number of series to process
-        
-    Returns:
-        tuple: (baseline_results, tuned_results) for comparison
-    """
     # Limit series if specified (useful for testing)
     if max_series:
         combinations = combinations.head(max_series)
@@ -995,16 +586,6 @@ def train_all_series_before_after(df, combinations, max_series=None):
     return baseline_results, tuned_results
 
 def compare_time_series_before_after(baseline_results, tuned_results):
-    """
-    Compare baseline vs tuned time series model performance.
-    
-    Args:
-        baseline_results: Dictionary containing baseline model results
-        tuned_results: Dictionary containing tuned model results
-        
-    Returns:
-        tuple: (prophet_comparison_df, sarima_comparison_df)
-    """
     print("\n" + "="*80)
     print("TIME SERIES BEFORE vs AFTER PARAMETER TUNING COMPARISON")
     print("="*80)
@@ -1099,7 +680,6 @@ def compare_time_series_before_after(baseline_results, tuned_results):
     return prophet_df, sarima_df
 
 def evaluate_time_series_models(baseline_results, tuned_results):
-    """Evaluate and compare baseline vs tuned time series models"""
     print("\n" + "="*50)
     print("TIME SERIES MODEL EVALUATION")
     print("="*50)
@@ -1176,7 +756,6 @@ def evaluate_time_series_models(baseline_results, tuned_results):
     return None, None
 
 def save_time_series_models(all_results):
-    """Save trained time series models"""
     models_dir = Path(__file__).parent.parent / "models" / "time_series"
     models_dir.mkdir(parents=True, exist_ok=True)
     
@@ -1195,12 +774,6 @@ def save_time_series_models(all_results):
     print(f"Saved {len(all_results['sarima'])} SARIMA models")
 
 def save_time_series_models(tuned_results):
-    """
-    Save trained time series models to disk for deployment.
-    
-    Args:
-        tuned_results: Dictionary containing tuned model results (best performing)
-    """
     models_dir = Path(__file__).parent.parent / "models" / "time_series"
     models_dir.mkdir(parents=True, exist_ok=True)
     
@@ -1249,23 +822,6 @@ def save_time_series_models(tuned_results):
 
 
 def main():
-    """
-    Main training pipeline for MTA KPI time series forecasting models with BEFORE/AFTER comparison.
-    
-    Executes comprehensive time series modeling workflow:
-    1. Load processed MTA performance data
-    2. Identify viable agency-indicator combinations
-    3. BASELINE: Train Prophet and SARIMA models with default parameters
-    4. TUNED: Train Prophet and SARIMA models with optimized parameters  
-    5. COMPARISON: Compare before vs after performance improvements
-    6. Save tuned models for deployment
-    
-    This demonstrates the impact of parameter optimization by training each model
-    twice - once with defaults and once with optimized parameters.
-    
-    Returns:
-        tuple: (baseline_results, tuned_results, comparison_results)
-    """
     print("="*80)
     print("MTA KPI PREDICTION - TIME SERIES MODEL TRAINING PIPELINE")
     print("="*80)

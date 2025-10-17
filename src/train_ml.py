@@ -26,14 +26,12 @@ from config import PROCESSED
 from eval import rmse, mae, mape
 
 def load_processed_data():
-    """Load the processed dataset for ML training"""
     print(f"Loading processed data from: {PROCESSED}")
     df = pd.read_parquet(PROCESSED)
     print(f"Loaded dataset with shape: {df.shape}")
     return df
 
 def prepare_ml_features(df):
-    """Prepare features for ML models"""
     print("Preparing features for ML training...")
     
     # Target variable
@@ -70,7 +68,6 @@ def prepare_ml_features(df):
     return df_clean, feature_cols, target_col
 
 def split_data_temporal(df, feature_cols, target_col, test_size=0.2):
-    """Split data temporally for time series validation"""
     # Sort by date to ensure temporal order
     df_sorted = df.sort_values('YYYY_MM').copy()
     
@@ -93,16 +90,6 @@ def split_data_temporal(df, feature_cols, target_col, test_size=0.2):
     return X_train, X_test, y_train, y_test, train_df, test_df
 
 def train_random_forest_baseline(X_train, y_train, X_test, y_test):
-    """
-    Train RandomForest model with DEFAULT parameters first to establish baseline.
-    
-    Args:
-        X_train, y_train: Training features and target
-        X_test, y_test: Test features and target for final evaluation
-        
-    Returns:
-        dict: Model results including trained model, metrics, and predictions
-    """
     print("\n" + "="*60)
     print("TRAINING RANDOM FOREST MODEL (BASELINE - DEFAULT PARAMETERS)")
     print("="*60)
@@ -110,9 +97,9 @@ def train_random_forest_baseline(X_train, y_train, X_test, y_test):
     
     # Default RandomForest configuration
     model = RandomForestRegressor(
-        random_state=42,        # Reproducibility
-        n_jobs=-1,             # Use all CPU cores
-        verbose=1              # Show training progress
+        random_state=42,        
+        n_jobs=-1,             
+        verbose=1              
     )
     
     # Robust time series cross-validation
@@ -177,37 +164,22 @@ def train_random_forest_baseline(X_train, y_train, X_test, y_test):
     return results
 
 def train_random_forest_tuned(X_train, y_train, X_test, y_test):
-    """
-    Train RandomForest model with OPTIMIZED hyperparameters for comparison.
-    
-    Uses optimal hyperparameters discovered through extensive tuning:
-    - 500 trees for stable predictions
-    - max_depth=15 prevents overfitting (reduces model size from 158MB to 27MB)
-    - Comprehensive cross-validation with TimeSeriesSplit
-    
-    Args:
-        X_train, y_train: Training features and target
-        X_test, y_test: Test features and target for final evaluation
-        
-    Returns:
-        dict: Model results including trained model, metrics, and predictions
-    """
     print("\n" + "="*60)
     print("TRAINING RANDOM FOREST MODEL (TUNED - OPTIMIZED PARAMETERS)")
     print("="*60)
     print("Configuration: 500 trees, max_depth=15, 10-fold CV")
     
-    # Optimal RandomForest configuration (extensively tuned)
+    # Optimal RandomForest configuration 
     model = RandomForestRegressor(
-        n_estimators=500,       # Optimal tree count for performance/stability balance
-        max_depth=15,           # Critical: prevents overfitting and reduces file size
-        min_samples_split=5,    # Prevents overfitting on small node splits
-        min_samples_leaf=2,     # Allows granular predictions while preventing noise
-        max_features=1.0,       # Use all features (optimal for this dataset)
-        bootstrap=True,         # Enable bootstrap sampling for robustness
-        random_state=42,        # Reproducibility
-        n_jobs=-1,             # Use all CPU cores
-        verbose=1              # Show training progress
+        n_estimators=500,           # Optimal tree count for performance/stability balance
+        max_depth=15,               # Critical: prevents overfitting and reduces file size
+        min_samples_split=5,        # Prevents overfitting on small node splits
+        min_samples_leaf=2,         # Allows granular predictions while preventing noise
+        max_features=1.0,           # Use all features (optimal for this dataset)
+        bootstrap=True,             # Enable bootstrap sampling for robustness
+        random_state=42,            # Reproducibility
+        n_jobs=-1,                  # Use all CPU cores
+        verbose=1                   # Show training progress
     )
     
     # Robust time series cross-validation
@@ -272,16 +244,6 @@ def train_random_forest_tuned(X_train, y_train, X_test, y_test):
     return results
 
 def train_xgboost_baseline(X_train, y_train, X_test, y_test):
-    """
-    Train XGBoost model with DEFAULT parameters first to establish baseline.
-    
-    Args:
-        X_train, y_train: Training features and target
-        X_test, y_test: Test features and target for final evaluation
-        
-    Returns:
-        dict: Model results including trained model, metrics, and predictions
-    """
     print("\n" + "="*60)
     print("TRAINING XGBOOST MODEL (BASELINE - DEFAULT PARAMETERS)")
     print("="*60)
@@ -289,9 +251,9 @@ def train_xgboost_baseline(X_train, y_train, X_test, y_test):
     
     # Default XGBoost configuration
     model = xgb.XGBRegressor(
-        random_state=42,         # Reproducibility
-        n_jobs=-1,              # Use all CPU cores
-        verbosity=1             # Show training progress
+        random_state=42,         
+        n_jobs=-1,              
+        verbosity=1             
     )
     
     # Time series cross-validation
@@ -368,21 +330,6 @@ def train_xgboost_baseline(X_train, y_train, X_test, y_test):
     return results
 
 def train_xgboost_tuned(X_train, y_train, X_test, y_test):
-    """
-    Train XGBoost model with OPTIMIZED hyperparameters for comparison.
-    
-    Uses extensively tuned parameters for optimal performance:
-    - 400 trees with controlled depth and learning rate
-    - Regularization to prevent overfitting
-    - Efficient 5-fold cross-validation
-    
-    Args:
-        X_train, y_train: Training features and target
-        X_test, y_test: Test features and target for final evaluation
-        
-    Returns:
-        dict: Model results including trained model, metrics, and predictions
-    """
     print("\n" + "="*60)
     print("TRAINING XGBOOST MODEL (TUNED - OPTIMIZED PARAMETERS)")
     print("="*60)
@@ -390,17 +337,17 @@ def train_xgboost_tuned(X_train, y_train, X_test, y_test):
     
     # Optimized XGBoost hyperparameters
     xgb_params = {
-        'n_estimators': 400,        # Optimal tree count
-        'max_depth': 12,            # Increased from default 6 for better performance
-        'learning_rate': 0.12,      # Optimized learning rate
-        'subsample': 1.0,           # Use full sample for robustness
-        'colsample_bytree': 0.8,    # Feature subsampling for regularization
-        'reg_lambda': 0.5,          # L2 regularization
-        'reg_alpha': 0,             # No L1 regularization (optimal for this data)
-        'min_child_weight': 1,      # Minimum weight in leaf nodes
-        'random_state': 42,         # Reproducibility
-        'n_jobs': -1,              # Use all CPU cores
-        'verbosity': 1             # Show training progress
+        'n_estimators': 400,            # Optimal tree count
+        'max_depth': 12,                # Increased from default 6 for better performance
+        'learning_rate': 0.12,          # Optimized learning rate
+        'subsample': 1.0,               # Use full sample for robustness
+        'colsample_bytree': 0.8,        # Feature subsampling for regularization
+        'reg_lambda': 0.5,              # L2 regularization
+        'reg_alpha': 0,                 # No L1 regularization (optimal for this data)
+        'min_child_weight': 1,          # Minimum weight in leaf nodes
+        'random_state': 42,             # Reproducibility
+        'n_jobs': -1,                   # Use all CPU cores
+        'verbosity': 1                  # Show training progress
     }
     
     # Time series cross-validation
@@ -469,16 +416,6 @@ def train_xgboost_tuned(X_train, y_train, X_test, y_test):
     return results
 
 def train_linear_regression_baseline(X_train, y_train, X_test, y_test):
-    """
-    Train Ridge Regression with DEFAULT parameters first to establish baseline.
-    
-    Args:
-        X_train, y_train: Training features and target
-        X_test, y_test: Test features and target for final evaluation
-        
-    Returns:
-        dict: Model results including trained model, metrics, and predictions
-    """
     print("\n" + "="*60)
     print("TRAINING RIDGE REGRESSION MODEL (BASELINE - DEFAULT PARAMETERS)")
     print("="*60)
@@ -487,7 +424,7 @@ def train_linear_regression_baseline(X_train, y_train, X_test, y_test):
     # Default Ridge configuration with preprocessing
     model = Pipeline([
         ('scaler', StandardScaler()),
-        ('ridge', Ridge(random_state=42))  # Default alpha=1.0
+        ('ridge', Ridge(random_state=42))  
     ])
     
     # Time series cross-validation
@@ -554,27 +491,6 @@ def train_linear_regression_baseline(X_train, y_train, X_test, y_test):
     return results
 
 def train_linear_regression_tuned(X_train, y_train, X_test, y_test):
-    """
-    Train COMPREHENSIVE REGULARIZED LINEAR REGRESSION models for optimal performance.
-    
-    Implements QUICK WIN strategy with multiple regularization techniques:
-    - Ridge Regression (L2) with extensive alpha grid
-    - Lasso Regression (L1) for automatic feature selection 
-    - ElasticNet (L1+L2) for balanced regularization
-    - Automated hyperparameter optimization with GridSearchCV
-    - Advanced feature engineering options
-    
-    This addresses the significant performance gap where linear regression 
-    performs 9x worse than RandomForest by implementing comprehensive
-    regularization strategies.
-    
-    Args:
-        X_train, y_train: Training features and target
-        X_test, y_test: Test features and target for final evaluation
-        
-    Returns:
-        dict: Best model results with comprehensive performance metrics
-    """
     print("\n" + "="*70)
     print("TRAINING COMPREHENSIVE REGULARIZED LINEAR REGRESSION (QUICK WIN)")
     print("="*70)
@@ -584,7 +500,6 @@ def train_linear_regression_tuned(X_train, y_train, X_test, y_test):
     # Time series cross-validation setup
     tscv = TimeSeriesSplit(n_splits=5)
     
-    # COMPREHENSIVE HYPERPARAMETER GRIDS
     # Expanded alpha ranges for better optimization
     alpha_range = [0.001, 0.01, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0]
     l1_ratio_range = [0.1, 0.3, 0.5, 0.7, 0.9]  # For ElasticNet
@@ -778,18 +693,6 @@ def train_linear_regression_tuned(X_train, y_train, X_test, y_test):
     return results
 
 def train_stacking_ensemble(X_train, y_train, X_test, y_test, trained_models):
-    """
-    Train a stacking ensemble using the best trained models as base learners.
-    
-    Args:
-        X_train, y_train: Training data
-        X_test, y_test: Test data  
-        trained_models: Dictionary of trained model results
-        
-    Returns:
-        Dictionary with ensemble results
-    """
-    
     print("\n" + "="*70)
     print("TRAINING STACKING ENSEMBLE (ADVANCED MODEL COMBINATION)")
     print("="*70)
@@ -925,16 +828,6 @@ def train_stacking_ensemble(X_train, y_train, X_test, y_test, trained_models):
     }
 
 def compare_before_after_models(baseline_results, tuned_results):
-    """
-    Compare baseline (default parameters) vs tuned (optimized parameters) model performance.
-    
-    Args:
-        baseline_results: Dictionary containing baseline model results
-        tuned_results: Dictionary containing tuned model results
-        
-    Returns:
-        pd.DataFrame: Comprehensive comparison results
-    """
     print("\n" + "="*80)
     print("BEFORE vs AFTER HYPERPARAMETER TUNING COMPARISON")
     print("="*80)
@@ -1001,13 +894,6 @@ def compare_before_after_models(baseline_results, tuned_results):
     return comparison_df
 
 def save_ml_models(results_dict, feature_cols):
-    """
-    Save trained ML models to disk with comprehensive metadata.
-    
-    Args:
-        results_dict: Dictionary containing model results
-        feature_cols: List of feature column names
-    """
     models_dir = Path(__file__).parent.parent / "models"
     models_dir.mkdir(exist_ok=True)
     
@@ -1062,12 +948,6 @@ def save_ml_models(results_dict, feature_cols):
     print("="*60)
 
 def compare_models(results_dict):
-    """
-    Generate comprehensive comparison of all trained models.
-    
-    Args:
-        results_dict: Dictionary containing results from all trained models
-    """
     print("\n" + "="*80)
     print("COMPREHENSIVE MODEL PERFORMANCE COMPARISON")
     print("="*80)
@@ -1112,22 +992,6 @@ def compare_models(results_dict):
     return comparison_df
 
 def main():
-    """
-    Main training pipeline for MTA KPI prediction models with BEFORE/AFTER comparison.
-    
-    Executes comprehensive ML training workflow:
-    1. Load and prepare data
-    2. PHASE 1: Train baseline models (default parameters)
-    3. PHASE 2: Train tuned models (optimized parameters) 
-    4. PHASE 3: Compare before vs after performance improvements
-    5. Save tuned models for deployment
-    
-    This demonstrates the impact of hyperparameter tuning by training each model
-    twice - once with defaults and once with optimized parameters.
-    
-    Returns:
-        tuple: (baseline_results, tuned_results, comparison_df)
-    """
     print("="*80)
     print("MTA KPI PREDICTION - ML MODEL TRAINING PIPELINE")
     print("="*80)
@@ -1224,9 +1088,6 @@ def main():
     except Exception as e:
         print(f"\n❌ ERROR during training pipeline: {e}")
         raise
-    
-    print("\nML Training Pipeline Completed!")
-    return baseline_results, tuned_results, comparison_df
 
 if __name__ == "__main__":
     baseline_results, tuned_results, comparison = main()
