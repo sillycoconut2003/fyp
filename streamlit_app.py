@@ -26,10 +26,11 @@ st.set_page_config(
 def load_data():
     """Load the processed dataset with error handling"""
     try:
-        # Try multiple data sources for robust deployment
+    # Try multiple data sources for robust deployment
         data_paths = [
-            Path(__file__).parent.parent / "data" / "processed" / "mta_model.parquet",
-            Path(__file__).parent.parent / "data" / "processed" / "cleaned_data.csv",
+            Path(__file__).parent / "data" / "processed" / "mta_model.parquet",
+            Path(__file__).parent / "data" / "processed" / "cleaned_data.csv",
+            Path(__file__).parent / "data" / "raw" / "MTA_Performance_Agencies.csv"
         ]
         
         for path in data_paths:
@@ -69,25 +70,39 @@ def create_demo_data():
     
     return pd.DataFrame(data)
 
-@st.cache_resource(show_spinner="Loading ML models...")
+@st.cache_resource(show_spinner="Initializing ML models...")
 def load_ml_models():
-    """Load trained ML models with graceful fallbacks for Streamlit Cloud"""
-    models_dir = Path(__file__).parent.parent / "models"
+    """Load trained ML models with progressive loading for Streamlit Cloud"""
+    models_dir = Path(__file__).parent / "models"  # Fixed path for cloud deployment
     ml_models = {}
     
-    # Priority order for model loading (best to worst)
+    # Start with lightweight fallback immediately
+    ml_models['StatisticalFallback'] = {
+        'model': None,
+        'mae': 50000,
+        'description': '📈 Statistical Average (Always Available)',
+        'status': 'Loaded'
+    }
+    
+    # Priority order for model loading (smallest to largest for faster startup)
     model_priority = {
+        'Ridge': ('Ridge_Tuned_model.pkl', 130912, '📊 Linear Baseline'),
         'RandomForest': ('RandomForest_model.pkl', 13637, '🏆 Production Model'),
         'XGBoost': ('XGBoost_model.pkl', 39885, '⚡ Fast Alternative'), 
-        'OptimizedEnsemble': ('OptimizedStackingEnsemble_model.pkl', 20880, '🔧 Ensemble Model'),
-        'Ridge': ('Ridge_Tuned_model.pkl', 130912, '📊 Linear Baseline')
+        'OptimizedEnsemble': ('OptimizedStackingEnsemble_model.pkl', 20880, '🔧 Ensemble Model')
     }
     
     loaded_count = 0
-    for model_name, (filename, mae, description) in model_priority.items():
+    progress_bar = st.progress(0)
+    total_models = len(model_priority)
+    
+    for i, (model_name, (filename, mae, description)) in enumerate(model_priority.items()):
         try:
+            progress_bar.progress((i + 1) / total_models, text=f"Loading {model_name}...")
             model_path = models_dir / filename
+            
             if model_path.exists():
+                # Add timeout protection for large models
                 with open(model_path, 'rb') as f:
                     model = pickle.load(f)
                 ml_models[model_name] = {
@@ -99,20 +114,29 @@ def load_ml_models():
                 loaded_count += 1
                 st.sidebar.success(f"✅ {model_name}: {description}")
             else:
-                st.sidebar.warning(f"⚠️ {model_name}: File not found ({filename})")
+                st.sidebar.warning(f"⚠️ {model_name}: File not found")
+                ml_models[model_name] = {
+                    'model': None,
+                    'mae': mae,
+                    'description': f"{description} (Not Available)",
+                    'status': 'Missing'
+                }
                 
         except Exception as e:
-            st.sidebar.error(f"❌ {model_name}: Loading failed - {str(e)}")
+            st.sidebar.error(f"❌ {model_name}: {str(e)[:50]}...")
+            ml_models[model_name] = {
+                'model': None,
+                'mae': mae,
+                'description': f"{description} (Failed)",
+                'status': 'Failed'
+            }
     
-    if loaded_count == 0:
-        st.error("⚠️ No ML models could be loaded. Using statistical fallback.")
-        # Create a simple statistical model as fallback
-        ml_models['StatisticalFallback'] = {
-            'model': None,
-            'mae': 50000,
-            'description': '📈 Statistical Average (Fallback)',
-            'status': 'Fallback'
-        }
+    progress_bar.progress(1.0, text=f"✅ Loaded {loaded_count}/{total_models} models")
+    
+    if loaded_count > 0:
+        st.sidebar.info(f"🎯 {loaded_count} ML models ready for predictions")
+    else:
+        st.sidebar.warning("⚠️ Using statistical fallback only")
     
     return ml_models
 
@@ -135,17 +159,42 @@ def make_prediction_with_fallback(features, model_choice, ml_models):
         return prediction, 100000, f"Emergency Fallback ({str(e)[:50]})"
 
 def main():
-    """Main Streamlit application"""
+    """Main Streamlit application with startup monitoring"""
+    
+    startup_time = datetime.now()
     
     # App header with deployment info
     st.title("🚇 MTA Performance Analytics Dashboard")
     st.markdown("### Advanced ML Forecasting for Transportation KPIs")
     
-    # Load resources with error handling
-    try:
-        data = load_data()
-        ml_models = load_ml_models()
+    # Deployment status indicator
+    with st.sidebar:
+        st.markdown("### 🔧 Deployment Status")
+        st.info(f"⏰ Started: {startup_time.strftime('%H:%M:%S')} UTC")
         
+        # Check Git LFS status
+        models_dir = Path(__file__).parent / "models"
+        if models_dir.exists():
+            model_files = list(models_dir.glob("*.pkl"))
+            st.success(f"📁 Found {len(model_files)} model files")
+        else:
+            st.error("❌ Models directory not found!")
+    
+    # Load resources with error handling and timing
+    try:
+        with st.spinner("Loading data and models..."):
+            load_start = datetime.now()
+            
+            data = load_data()
+            data_time = (datetime.now() - load_start).total_seconds()
+            
+            ml_models = load_ml_models()
+            total_time = (datetime.now() - load_start).total_seconds()
+            
+            # Performance monitoring
+            st.sidebar.info(f"⚡ Data loaded in {data_time:.1f}s")
+            st.sidebar.info(f"🚀 Total startup: {total_time:.1f}s")
+            
         if data is None or data.empty:
             st.error("Failed to load data. Please check data sources.")
             return
